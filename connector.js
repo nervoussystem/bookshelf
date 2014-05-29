@@ -4,9 +4,9 @@ var vec2 = glMatrix.vec2;
 var nurbs = require("./nurbs.js");
 var vboMesh = require("./vboMesh.js");
 var woodWidth = 12.2;
-var conLen = 45;
+var conLen = 35; //45
 var conOffset = 12;
-var conWidth = 20;
+var conWidth = 12;//20
 var shelfOffset = 15;
 var printTolerance = 0;
 

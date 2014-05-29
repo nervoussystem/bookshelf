@@ -34,6 +34,9 @@
    newcap:true, trailing:true, maxcomplexity:11, indent:4 
  */
 
+/*
+  edited by Nervous System, 2014
+*/
 
 /*
  * Note

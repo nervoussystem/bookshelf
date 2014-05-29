@@ -93,16 +93,19 @@ nurbs.findKnot = function(knots,u,degree) {
 nurbs.setDegree = function(deg) {
 }
 	
-nurbs.evaluateCrv = function(crv,u,pt) {
-	var currKnot = nurbs.findKnot(crv.knots,u,crv.degree);
-	
-	nurbs.basisFunctions(crv.knots,crv.degree,currKnot, u,nurbs.basisFuncs);
-	var evalPt = vec4.create();
-	for(var i = 0;i<=crv.degree;++i) {
-	  vec4.scaleAndAdd(evalPt, evalPt,crv.controlPts[currKnot-crv.degree+i], nurbs.basisFuncs[i]);
-	}
-	return vec4.projectDown(evalPt,pt);
-}
+nurbs.evaluateCrv = (function() {
+  var evalPt = vec4.create();
+  return function evaluateCrv(crv,u,pt) {
+    var currKnot = nurbs.findKnot(crv.knots,u,crv.degree);
+    
+    nurbs.basisFunctions(crv.knots,crv.degree,currKnot, u,nurbs.basisFuncs);
+    vec4.set(evalPt,0,0,0,0);
+    for(var i = 0;i<=crv.degree;++i) {
+      vec4.scaleAndAdd(evalPt, evalPt,crv.controlPts[currKnot-crv.degree+i], nurbs.basisFuncs[i]);
+    }
+    return vec4.projectDown(evalPt,pt);  
+  }
+})();
 /*	 
 	 public PVector derivative(float u, int k) {
 		 Vector4D[] derivesW = new Vector4D[k+1];
@@ -298,26 +301,27 @@ nurbs.findMultiplicity = function(knots,knot) {
 	return mult-1;
 }
 	 
-nurbs.basisFunctions = function(knots,degree,knot,u,funcs) {
-	var left = new Float32Array(degree+1);
-	var right = new Float32Array(degree+1);
+nurbs.basisFunctions = (function() {
+  var left = new Float32Array(nurbs.MAX_DEGREE+1);
+  var right = new Float32Array(nurbs.MAX_DEGREE+1);
+  return function basisFunctions(knots,degree,knot,u,funcs) {
 
-	funcs[0] = 1;
-	var j, r, saved, temp;
-	for( j=1;j<=degree;++j) {
-	  left[j] = u-knots[knot+1-j];
-	  right[j] = knots[knot+j]-u;
-	  saved = 0;
-	  for( r = 0;r<j;++r) {
-		temp = funcs[r]/(right[r+1]+left[j-r]);
-		funcs[r] = saved+right[r+1]*temp;
-		saved = left[j-r]*temp;
-	  }
-	  funcs[j] = saved;
-	}
-	return funcs;
-}
-	  
+    funcs[0] = 1;
+    var j, r, saved, temp;
+    for( j=1;j<=degree;++j) {
+      left[j] = u-knots[knot+1-j];
+      right[j] = knots[knot+j]-u;
+      saved = 0;
+      for( r = 0;r<j;++r) {
+      temp = funcs[r]/(right[r+1]+left[j-r]);
+      funcs[r] = saved+right[r+1]*temp;
+      saved = left[j-r]*temp;
+      }
+      funcs[j] = saved;
+    }
+    return funcs;
+  }
+})();
 	  
 nurbs.deriveBasisFunctions = function(knots,degree,knot, u, der) {
 	var left,right;
