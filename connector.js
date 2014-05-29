@@ -3,11 +3,11 @@ var vec3 = glMatrix.vec3;
 var vec2 = glMatrix.vec2;
 var nurbs = require("./nurbs.js");
 var vboMesh = require("./vboMesh.js");
-var woodWidth = 12;
-var conLen = 50;
+var woodWidth = 12.2;
+var conLen = 45;
 var conOffset = 12;
-var conWidth = 12;
-var shelfOffset = 12;
+var conWidth = 20;
+var shelfOffset = 15;
 var printTolerance = 0;
 
 function initConnector() {
