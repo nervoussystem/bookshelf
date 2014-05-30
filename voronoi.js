@@ -1,5 +1,7 @@
 var glMatrix = require('../js/gl-matrix-min.js');
 var poly2tri = require('./poly2tri.js');
+var hemesher = require('../js/hemesh.js');
+var hemesh = hemesher.hemesh;
 var vec3 = glMatrix.vec3;
 var vec2 = glMatrix.vec2;
 
@@ -8,7 +10,7 @@ var pts = [];
 
 var outsidePts = [];
 var triangles = [];
-
+var voroMesh = new hemesh();
 var width = 1200;
 var height = 1200;
 function reset() {
@@ -141,6 +143,17 @@ var centroidal = (function() {
       if(!pt.fixed) {
         totalArea = 0;
         vec2.set(centroid,0,0);
+        var e = pt.cell.e;
+        do {
+          v1 = e.v.pos;
+          e = e.next;
+          v2 = e.v.pos;
+          area = v1[0]*v2[1]-v1[1]*v2[0];
+          totalArea += v1[0]*v2[1]-v1[1]*v2[0];
+          centroid[0] += (v1[0]+v2[0])*area;
+          centroid[1] += (v1[1]+v2[1])*area;
+        } while(e != pt.cell.e);
+        /*
         for(var j=0,l=pt.cell.length;j<l;++j) {
           var jNext = (j+1)%l;
           v1 = pt.cell[j];
@@ -150,6 +163,7 @@ var centroidal = (function() {
           centroid[0] += (v1[0]+v2[0])*area;
           centroid[1] += (v1[1]+v2[1])*area;
         }
+        */
         vec2.scale(centroid,centroid,1.0/totalArea/3.0);
         var dx = Math.min(Math.max(Math.random(.1),centroid[0]),width-Math.random(.1))-pt.x;
         var dy = Math.min(Math.max(Math.random(.1),centroid[1]),height-Math.random(.1))-pt.y;
@@ -162,28 +176,119 @@ var centroidal = (function() {
   }
 })();
 
+var ptToEdge = [];
 var buildCells = function() {
+  voroMesh.clear();
+  ptToEdge.length = 0;
+  for(var i=0;i<triangles.length;++i) {
+    var t = triangles[i];
+    var v = voroMesh.addVertex(t.circumcenter);
+    t.v = v;
+  }
   for(var i=0;i<triangles.length;++i) {
     var t = triangles[i];
     for(var j=0;j<3;++j) {
       var pt = t.points_[j];
       if(!pt.fixed) {
-        if(!pt.cell){ 
+        if(!pt.cell){
           buildCell(pt,t);
+        }
+      }
+    }
+  }
+  makeBoundaryEdges(voroMesh, ptToEdge);
+}
+
+function buildCell(pt,t) {
+  pt.cell = voroMesh.addFace();
+  var prevV = t.v;
+  t = t.neighborCCW(pt);
+  var startT = t;
+  var e, prevE = null;
+  do {
+    //pt.cell.push(t.circumcenter);
+    e = voroMesh.addEdge();
+    
+    e.v = t.v;
+    e.v.e = e;
+    if(prevE) {
+      prevE.next = e;
+    } else {
+      pt.cell.e = e;
+    }
+    e.face = pt.cell;
+    findPair(e,ptToEdge,prevV.index, e.v.index);
+    prevV = t.v;
+    prevE = e;
+    t = t.neighborCCW(pt);
+  } while(t != startT);
+  prevE.next = pt.cell.e;
+}
+
+//build hedge structure
+function findPair(e,ptToEdge,i1,i2) {
+  var ptEdge = ptToEdge[i2];
+  if(ptEdge) {
+    for(var i=0;i<ptEdge.length;++i) {
+      var e2 = ptEdge[i];
+      if(e2.v.index == i1) {
+        e2.pair = e;
+        e.pair = e2;
+        return;
+      }
+    }
+  }
+  ptEdge = ptToEdge[i1];
+  if(ptEdge) {
+    ptEdge.push(e);
+  } else {
+    ptEdge = [e];
+    ptToEdge[i1] = ptEdge;
+  }
+}
+
+function makeBoundaryEdges(mesh,ptToEdge) {
+  //add boundary edges and unsure every edge has a pair
+  var numEdges = mesh.edges.length;
+  var e,v,startV;
+  for(var i=0;i<numEdges;++i) {
+     e = mesh.edges[i];
+    if(e.pair == null) {
+      var newEdge = mesh.addEdge();
+      newEdge.pair = e;
+      e.pair = newEdge;
+      
+      //lets try the inefficient route
+      startV = e.v;
+      do {
+        v = e.v;
+        e = e.next;
+      } while(e.v != startV);
+      newEdge.v = v;
+      newEdge.v.b = true;
+      var ptEdge = ptToEdge[startV.index];
+      ptEdge.push(newEdge);
+    }
+  }
+  for(var i=numEdges;i<mesh.edges.length;++i) {
+    e = mesh.edges[i];
+    var ptEdge = ptToEdge[e.v.index];
+    if(ptEdge) {
+      for(var j=0;j<ptEdge.length;++j) {
+        var e2 = ptEdge[j];
+        if(e2.face == hemesh.HEMESH_NULLFACE) {
+          e.next = e2;
         }
       }
     }
   }
 }
 
-function buildCell(pt,t) {
-  pt.cell = [];
-  var startT = t;
-  do {
-    pt.cell.push(t.circumcenter);
-    t = t.neighborCCW(pt);
-  } while(t != startT);  
-}
+var trimCells = (function() {
+  return function trimCells() {
+    
+  }
+})();
 
 exports.init = init;
 exports.reset = reset;
@@ -192,3 +297,4 @@ exports.pts = pts;
 exports.triangles = triangles;
 exports.setDimensions = setDimensions;
 exports.centroidal = centroidal;
+exports.mesh = voroMesh;

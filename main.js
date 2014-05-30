@@ -72,6 +72,7 @@ function draw2d() {
   ctx.save();
   ctx.scale(scaling,scaling);
   drawCells2d();
+  //drawEdges2d();
   drawNodes2d();
   ctx.restore();
   
@@ -104,6 +105,7 @@ function drawEdges2d() {
 function drawCells2d() {
   
   ctx.strokeStyle = "black";
+  /*
   var v;
   for(var i=0;i<voronoi.pts.length;++i) {
     var pt = voronoi.pts[i];
@@ -117,7 +119,22 @@ function drawCells2d() {
     ctx.closePath();
     ctx.stroke();
   }
-  ctx.stroke();
+  */
+  for(var i=0;i<voronoi.mesh.faces.length;++i) {
+    var f = voronoi.mesh.faces[i];
+    var e = f.e;
+    var startE = e;
+    ctx.beginPath();
+    
+    ctx.moveTo(e.v.pos[0],e.v.pos[1]);
+    e = e.next;
+    do {
+      ctx.lineTo(e.v.pos[0],e.v.pos[1]);
+      e = e.next;
+    } while(e != startE);
+    ctx.closePath();
+    ctx.stroke();
+  }
 }
 
 function drawNodes2d() {
@@ -143,7 +160,7 @@ function draw3d() {
   
   colorShader.begin();
   mat4.identity(mvMatrix);
-  mat4.ortho(pMatrix,-100,1000,1000,-100,-10,100);
+  mat4.ortho(pMatrix,-200,1500,1500,-200,-10,100);
   
   //set color
   colorShader.uniforms.matColor.set([0,0,0,1]);
