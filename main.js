@@ -160,7 +160,7 @@ function draw3d() {
   
   colorShader.begin();
   mat4.identity(mvMatrix);
-  mat4.ortho(pMatrix,-200,1500,1500,-200,-10,100);
+  mat4.ortho(pMatrix,-500,2000,2000,-500,-10,100);
   
   //set color
   colorShader.uniforms.matColor.set([0,0,0,1]);
@@ -207,14 +207,20 @@ function voronoiToEdgeVBO() {
 }
 
 function getConnectors() {
-  for(var i=0;i<voronoi.triangles.length;++i) {
-    var tri = voronoi.triangles[i];
-    if(tri.interior_) {
-      if(tri.neighbors_[0] && tri.neighbors_[0].interior_ &&
-        tri.neighbors_[1] && tri.neighbors_[1].interior_ &&
-        tri.neighbors_[2] && tri.neighbors_[2].interior_) {
-        connector.createConnector(tri,connectorVbo);
-      }
+  //for(var i=0;i<voronoi.triangles.length;++i) {
+  //  var tri = voronoi.triangles[i];
+  //  if(tri.interior_) {
+  //    if(tri.neighbors_[0] && tri.neighbors_[0].interior_ &&
+  //      tri.neighbors_[1] && tri.neighbors_[1].interior_ &&
+  //      tri.neighbors_[2] && tri.neighbors_[2].interior_) {
+  //      connector.createConnector(tri,connectorVbo);
+  //    }
+  //  }
+  //}
+  for(var i=0;i<voronoi.mesh.vertices.length;++i) {
+    var v = voronoi.mesh.vertices[i];
+    if(v.e) {
+      connector.createConnector(v,connectorVbo);
     }
   }
   vboMesh.buffer(connectorVbo);

@@ -15,35 +15,38 @@ function initConnector() {
 }
 
 var createConnector = (function() {
-  var dir1 = vec3.create();
-  var dir2 = vec3.create();
-  var dir3 = vec3.create();
+  var maxValence = 7;
+  var dirs = [];
+  for(var i=0;i<maxValence;++i) {
+    dirs[i] = vec3.create();
+  }
   var pt = vec3.create();
   var pt2 = vec3.create();
-  var dirs = [dir1,dir2,dir3];
   var dir, nDir;
   var perp = vec3.create();
   var bisector = vec3.create();
-  return function createConnector(tri,vboOut) {
-    var center = tri.circumcenter;
-    var p1 = tri.neighbors_[0].circumcenter;
-    var p2 = tri.neighbors_[1].circumcenter;
-    var p3 = tri.neighbors_[2].circumcenter;
-    vec3.sub(dir1,p1,center);
-    vec3.sub(dir2,p2,center);
-    vec3.sub(dir3,p3,center);
+  var e,startE;
+  return function createConnector(v,vboOut) {
+    startE = v.e;
+    e = startE;
+    var center = v.pos;
+    var index = 0;
+    do {
+      e = e.next;
+      vec3.sub(dirs[index],e.v.pos,center);
+      vec3.normalize(dirs[index],dirs[index]);
+      e = e.pair;
+      index++;
+    } while(e != startE);
+    var numLegs = index;
     
-    vec3.normalize(dir1,dir1);
-    vec3.normalize(dir2,dir2);
-    vec3.normalize(dir3,dir3);
-
     var baseIndex = vboOut.numVertices;
     var numPts = 0;
     
-    for(var i=0;i<3;++i) {
+    for(var i=0;i<numLegs;++i) {
       //make points
       dir = dirs[i];
-      nDir = dirs[(1<<i)&3];
+      nDir = dirs[(i+1)%numLegs];
       vec2.set(perp,dir[1],-dir[0]);
       vec3.scaleAndAdd(pt,center, dir, conLen+shelfOffset);
       vec2.scaleAndAdd(pt,pt,perp,woodWidth*0.5+printTolerance);      
@@ -75,8 +78,13 @@ var createConnector = (function() {
       nurbs.addPoint(crv,pt);
       
       //get offset
-      vec3.add(bisector, dir,nDir);
-      vec3.normalize(bisector,bisector);
+      bisector[0] = dir[0]-nDir[0];
+      bisector[1] = dir[1]-nDir[1];
+      vec2.normalize(bisector,bisector);
+      //rotate 90
+      var temp = bisector[0];
+      bisector[0] = -bisector[1];
+      bisector[1] = temp;
       var sinA = Math.abs(bisector[0]*dir[1]-bisector[1]*dir[0]);
       vec3.scaleAndAdd(pt,center,bisector,(woodWidth*0.5+conOffset)/sinA);
 

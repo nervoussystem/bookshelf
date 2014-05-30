@@ -1,3 +1,5 @@
+"use strict"
+
 var glMatrix = require('../js/gl-matrix-min.js');
 var poly2tri = require('./poly2tri.js');
 var hemesher = require('../js/hemesh.js');
@@ -47,6 +49,9 @@ var voronoi = (function() {
     triangulation.addPoints(pts);
     triangulation.triangulate();
     
+    for(var i=0;i<outsidePts.length;++i) {
+      outsidePts[i]._p2t_edge_list = null;
+    }
     for(var i=0;i<pts.length;++i) {
       pts[i]._p2t_edge_list = null;
       pts[i].cell = null;
@@ -65,6 +70,7 @@ var voronoi = (function() {
     }
     
     buildCells();
+    trimCells();
   }
 })();
 
@@ -135,7 +141,7 @@ function setDimensions(w,h) {
 var centroidal = (function() {
   var centroid = vec2.create();
   var center = vec2.create();
-  var area;
+  var area,totalArea;
   var v1,v2;
   return function centroidal() {
     for(var i=0;i<pts.length;++i) {
@@ -276,7 +282,7 @@ function makeBoundaryEdges(mesh,ptToEdge) {
     if(ptEdge) {
       for(var j=0;j<ptEdge.length;++j) {
         var e2 = ptEdge[j];
-        if(e2.face == hemesh.HEMESH_NULLFACE) {
+        if(e2.face == hemesh.NULLFACE) {
           e.next = e2;
         }
       }
@@ -284,11 +290,264 @@ function makeBoundaryEdges(mesh,ptToEdge) {
   }
 }
 
-var trimCells = (function() {
-  return function trimCells() {
-    
+function isInside(pt) {
+  return pt[0] > 0 && pt[0] < width && pt[1] > 0 && pt[1] < height;
+}
+
+var trimEdge = (function() {
+  var dir = vec2.create();
+  return function trimEdge(out,inP,outP) {
+    vec2.sub(dir,outP,inP);
+    if(outP[0] < 0) {
+      if(outP[1] <0) {
+        var len = Math.min(-inP[0]/dir[0],-inP[1]/dir[1]);
+        out[0] = inP[0]+dir[0]*len;
+        out[1] = inP[1]+dir[1]*len;
+      
+      } else if(outP[1] > height) {
+        var len = Math.min(-inP[0]/dir[0],(height-inP[1])/dir[1]);
+        out[0] = inP[0]+dir[0]*len;
+        out[1] = inP[1]+dir[1]*len;
+      
+      } else {
+        out[0] = 0;
+        out[1] = inP[1]+dir[1]*(-inP[0]/dir[0]);
+      }
+    } else if(outP[0] > width) {
+      if(outP[1] <0) {
+        var len = Math.min((width-inP[0])/dir[0],-inP[1]/dir[1]);
+        out[0] = inP[0]+dir[0]*len;
+        out[1] = inP[1]+dir[1]*len;      
+      } else if(outP[1] > height) {
+        var len = Math.min((width-inP[0])/dir[0],(height-inP[1])/dir[1]);
+        out[0] = inP[0]+dir[0]*len;
+        out[1] = inP[1]+dir[1]*len;      
+      
+      } else {
+        out[0] = width;
+        out[1] = inP[1]+dir[1]*((width-inP[0])/dir[0]);      
+      }
+    } else {
+      if(outP[1] < 0) {
+        out[1] = 0;
+        out[0] = inP[0]+dir[0]*(-inP[1]/dir[1]);
+      } else if(outP[1] > height) {
+        out[1] = height;
+        out[0] = inP[0]+dir[0]*((height-inP[1])/dir[1]);
+      
+      }
+    }
   }
 })();
+
+var trimCells = (function() {
+  var f;
+  return function trimCells() {
+    for(var i=0,l = voroMesh.faces.length;i<l; ++i) {
+      f = voroMesh.faces[i];
+      trimFace(f);
+    }
+  }
+})();
+var trimFace = (function() {
+  var trimPt = vec3.create();
+  var v,e, startE, prevE;
+  var newV;
+  return function trimFace(f) {
+    startE = f.e;
+    e = startE;
+    //get to an inside point
+    //watchout for infinite loop (not done)
+    while(!isInside(e.v.pos)) {
+      e = e.next;
+    }
+    startE = e;
+    //find first outside pt
+    do {
+      
+      prevE = e;
+      e = e.next;
+    } while(isInside(e.v.pos) && e != startE);
+    
+    if(isInside(e.v.pos)) { return; }
+    
+    startE = e;
+    f.e = e;      
+    //has this edge already been trimmed
+    if(e.pair.info.trimmed) {
+      //point e to trimmed;
+      newV = e.pair.info.trimmed;
+      e.v = newV;
+    } else {
+      //make new trimmed vertex and point to that
+      trimEdge(trimPt, e.pair.v.pos, e.v.pos);
+      newV = voroMesh.addVertex(trimPt);
+      newV.b = true;
+      newV.e = e;
+      e.v.e = null;
+      e.v = newV;
+      e.info.trimmed = newV;
+    }
+    
+    e = e.next;
+    while(!isInside(e.v.pos)) {
+      e.v.e = null;
+      e = e.next;
+    }    
+    //has this edge already been trimmed
+    if(e.pair.info.trimmed) {
+      //point e to trimmed;
+      newV = e.pair.info.trimmed;
+    } else {
+      //make new trimmed vertex and point to that
+      trimEdge(trimPt,  e.v.pos,e.pair.v.pos);
+      newV = voroMesh.addVertex(trimPt);
+      newV.b = true;
+      e.info.trimmed = newV;
+    }
+    
+    // corner
+    //may need to check for floating point errors
+    if(startE.v.pos[0] != newV.pos[0] && startE.v.pos[0] != newV.pos[0]) {
+      //which corner
+      if(startE.v.pos[0] == 0 || newV.pos[0] == 0) {
+        trimPt[0] = 0;
+      } else if(startE.v.pos[0] == width || newV.pos[0] == width) {
+        trimPt[0] = width;
+      }
+      
+      if(startE.v.pos[1] == 0 || newV.pos[1] == 0) {
+        trimPt[1] = 0;
+      } else if(startE.v.pos[1] == height || newV.pos[1] == height) {
+        trimPt[1] = height;
+      }
+      //add corner
+      var cornerV = voroMesh.addVertex(trimPt);
+      var newE = voroMesh.addEdge();
+      var newEP = voroMesh.addEdge();
+      var newE2 = voroMesh.addEdge();
+      var newEP2 = voroMesh.addEdge();
+      
+      newE.face = f;
+      newE2.face = f;
+      newE.v = cornerV;
+      newE2.v = newV;
+      cornerV.e = newE;
+      newV.e = newE2;
+      newE.pair = newEP;
+      newEP.pair = newE;
+      newE2.pair = newEP2;
+      newEP2.pair = newE2;
+      newEP2.v = cornerV;
+      newEP.v = startE.v;
+      newE.next = newE2;
+      newEP2.next = newEP;
+      startE.next = newE;
+      newE2.next = e;
+      
+      if(startE.pair.info.trimB) {
+        newEP.next = startE.pair.info.trimB;
+      } else {
+        startE.info.trimB = newEP;
+      }
+      if(e.pair.info.trimB) {
+        e.pair.info.trimB.next = newEP2;
+      } else {
+        e.info.trimB = newEP2;
+      }
+    } else {
+      //connect the edges
+      var newE = voroMesh.addEdge();
+      var newEP = voroMesh.addEdge();
+      newE.v = newV;
+      newV.e = newE;
+      newE.face = f;
+      newE.pair = newEP;
+      newEP.pair = newE;
+      newEP.v = startE.v;
+      newE.next = e;
+      startE.next = newE;
+      if(startE.pair.info.trimB) {
+        newEP.next = startE.pair.info.trimB;
+      } else {
+        startE.info.trimB = newEP;
+      }
+      if(e.pair.info.trimB) {
+        e.pair.info.trimB.next = newEP;
+      } else {
+        e.info.trimB = newEP;
+      }
+    }
+  }
+})();
+/*
+    var v, v2, startE,e,cv, prevE, prevEP, ePair, eNext;;
+    for(var i=0,l=voroMesh.vertices.length;i<l;++i) {
+      v = voroMesh.vertices[i];
+      if(v.e && v.b) {
+        //trim pt
+        if(!isInside(v.pos)) {
+          startE = v.e;
+          e = startE;
+          prevE = null;
+          do {
+            ePair = e.pair;
+            eNext = e.next.pair;
+            v2 = ePair.v;
+            //trim edge
+            cv = v;
+            
+            if(isInside(v2.pos)) {
+              trimEdge(trimPt,v2.pos,v.pos);
+              
+              cv = voroMesh.addVertex(trimPt);
+              cv.b = true;
+              cv.e = e;
+              e.v = cv;
+              var newE = voroMesh.addEdge();
+              newE.face = e.face;
+              newE.next = e.next;
+              newE.v = v;
+              e = newE;
+              
+              if(prevE) {
+                prevE.next = ePair;
+              }
+            }
+            
+            if(prevE) {
+              prevE.v = cv;
+              prevE.next = ePair.next;
+              prevE.face.e = prevE;
+              prevE.v.e = prevE;
+            }
+            if(e.face != hemesh.NULLFACE) {
+            
+              var newEP = voroMesh.addEdge();
+              newEP.v = cv;
+              newEP.pair = prevE;
+              newEP.next = prevEP;
+              
+              prevEP = newEP;
+            } else {
+              e.pair = prevE;
+              e.next = prevEP;
+              e.v = _;//??
+              prevEP = e;
+            }
+            
+            prevE = e;
+            e = eNext;
+          } while(e != startE);
+          
+          
+          
+          v.e = null;
+        }
+      }
+    }
+
+*/
 
 exports.init = init;
 exports.reset = reset;
