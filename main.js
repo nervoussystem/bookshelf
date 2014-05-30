@@ -25,8 +25,9 @@ var nMatrix = mat3.create();
 var connectorVbo;
 
 var shelfWidth = 1200;
-var shelfHeight = 1200;
+var shelfHeight = 1800;
 
+var minimumShelf = 100;
 var selectedPt = -1;
 
 function init() {
@@ -57,6 +58,9 @@ function step() {
   vboMesh.clear(connectorVbo);
   voronoi.voronoi();
   voronoi.centroidal();
+  fixShelves();
+  fixShelves();
+  fixShelves();
   getConnectors();
   draw();
 }
@@ -224,6 +228,32 @@ function getConnectors() {
     }
   }
   vboMesh.buffer(connectorVbo);
+}
+
+function fixShelves() {
+  var dir = vec2.create();
+  for(var i=0;i<voronoi.mesh.edges.length;++i) {
+    var e = voronoi.mesh.edges[i];
+    if(e.v.e != null) {
+      var v1 = e.v;
+      var v2 = e.pair.v;
+      //check length;
+      var len = vec2.sqrDist(v1.pos,v2.pos);
+      //collapse edge
+      if(len < minimumShelf*minimumShelf*0.04) {
+        voronoi.mesh.simpleCollapse(e);
+        //i--;
+      //expand
+      } else if(len < minimumShelf*minimumShelf*.95) {
+        vec2.sub(dir, v2.pos, v1.pos);
+        //vec2.normalize(dir,dir);
+        len = Math.sqrt(len);
+        vec2.scale(dir, dir, (minimumShelf-len)*0.5/len);
+        vec2.scaleAndAdd(v2.pos,v2.pos,dir,.5);
+        vec2.scaleAndAdd(v1.pos,v1.pos,dir,-.5);
+      }
+    }
+  }
 }
 
 function initVoronoi() {

@@ -20,9 +20,10 @@ function reset() {
   pts.length = 0;
   
   var spacing = width/4;
+  var spacingY = height/4;
   for(var i=0;i<4;++i) {
     for(var j=0;j<4;++j) {
-      pts.push({x:i*spacing+j%2*spacing*0.5,y:j*spacing+spacing*0.5});
+      pts.push({x:i*spacing+j%2*spacing*0.5,y:j*spacingY+spacingY*0.5});
     }
   }
 }
@@ -173,7 +174,7 @@ var centroidal = (function() {
         vec2.scale(centroid,centroid,1.0/totalArea/3.0);
         var dx = Math.min(Math.max(Math.random(.1),centroid[0]),width-Math.random(.1))-pt.x;
         var dy = Math.min(Math.max(Math.random(.1),centroid[1]),height-Math.random(.1))-pt.y;
-        if(dx*dx+dy*dy > 4) {
+        if(dx*dx+dy*dy > 16) {
           pt.x += .25*dx;
           pt.y += .25*dy;
           }
@@ -340,6 +341,8 @@ var trimEdge = (function() {
   }
 })();
 
+var EPSILON = .00001;
+
 var trimCells = (function() {
   var f;
   return function trimCells() {
@@ -358,9 +361,9 @@ var trimFace = (function() {
     e = startE;
     //get to an inside point
     //watchout for infinite loop (not done)
-    while(!isInside(e.v.pos)) {
+    do {
       e = e.next;
-    }
+    } while(!isInside(e.v.pos) && e != startE);
     startE = e;
     //find first outside pt
     do {
