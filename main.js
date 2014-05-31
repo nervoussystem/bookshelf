@@ -42,6 +42,7 @@ function init() {
   colorShader = glShader.loadShader(gl,"../shaders/simpleColor.vert","../shaders/simpleColor.frag");
   vboMesh.setGL(gl);
   initVoronoi();
+  connector.initConnector(gl);
   
   voronoiEdges = vboMesh.create();
   connectorVbo = vboMesh.create32();
