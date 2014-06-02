@@ -27,7 +27,7 @@ var connectorVbo;
 var shelfWidth = 1200;
 var shelfHeight = 1800;
 
-var minimumShelf = 100;
+var minimumShelf = 105;
 var selectedPt = -1;
 
 function init() {
@@ -59,6 +59,7 @@ function step() {
   vboMesh.clear(connectorVbo);
   voronoi.voronoi();
   voronoi.centroidal();
+  fixShelves();
   fixShelves();
   fixShelves();
   fixShelves();
@@ -222,6 +223,18 @@ function getConnectors() {
   //    }
   //  }
   //}
+  //label edges
+  var label = 0;
+  for(var i=0;i<voronoi.mesh.edges.length;++i) {
+    var e = voronoi.mesh.edges[i];
+    if(e.v.e) {
+      if(typeof e.info.label == "undefined") {
+        e.info.label = label++;
+        e.pair.info.label = e.info.label;
+      }
+    }
+  }
+  
   for(var i=0;i<voronoi.mesh.vertices.length;++i) {
     var v = voronoi.mesh.vertices[i];
     if(v.e) {
@@ -250,8 +263,12 @@ function fixShelves() {
         //vec2.normalize(dir,dir);
         len = Math.sqrt(len);
         vec2.scale(dir, dir, (minimumShelf-len)*0.5/len);
-        vec2.scaleAndAdd(v2.pos,v2.pos,dir,.5);
-        vec2.scaleAndAdd(v1.pos,v1.pos,dir,-.5);
+        if(!v2.b) {
+          vec2.scaleAndAdd(v2.pos,v2.pos,dir,.5);
+        }
+        if(!v1.b) {
+          vec2.scaleAndAdd(v1.pos,v1.pos,dir,-.5);
+        }
       }
     }
   }
@@ -268,11 +285,39 @@ function initVoronoi() {
 function keyPress(event) {
   switch(event.which) {
     case "D".charCodeAt(0):
-      downloadVboAsSTL(connectorVbo);
+      download();
       break;
   }
 }
 
+function download() {
+  var lenStr = "";
+  var lens = [];
+  var accuracy = 3.175;
+  for(var i=0;i<voronoi.mesh.edges.length;++i) {
+    var e = voronoi.mesh.edges[i];
+    if(e.v.e) {
+      var len = vec2.dist(e.v.pos,e.pair.v.pos)-connector.shelfOffset*2;
+      len /= accuracy;
+      len = Math.floor(len);
+      len *= accuracy;
+      lens[e.info.label] = len;
+    }
+  }
+  for(var i=0;i<lens.length;++i) {
+    if(lens[i]) {
+      lenStr += i + " " + (lens[i]/25.4).toFixed(3) + "\n";
+    }
+  }
+  
+  var a = document.createElement('a');
+  var blob = new Blob([lenStr]);
+  a.href = window.URL.createObjectURL(blob);
+  a.download = "lengths"+new Date().toISOString().substring(0,16)+".txt";
+  a.click();
+  
+  downloadVboAsSTL(connectorVbo);
+}
 function screenToReal(x,y,out) {
   var scaling = Math.min(canvas.offsetWidth/shelfWidth,canvas.offsetHeight/shelfHeight);
   out[0] = x/scaling;
@@ -356,7 +401,7 @@ function downloadVboAsSTL(vbo) {
   var a = document.createElement('a');
   var blob = new Blob([buffer], {'type':'application\/octet-stream'});
   a.href = window.URL.createObjectURL(blob);
-  a.download = "vbo"+new Date().toISOString().substring(0,16)+".stl";
+  a.download = "connectors"+new Date().toISOString().substring(0,16)+".stl";
   a.click();
 }
 

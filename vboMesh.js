@@ -210,6 +210,37 @@ vboMesh.addLine = function(vbo, i1,i2) {
   vbo.indexData[vbo.numIndices++] = i2;
 }
 
+vboMesh.addMesh = (function() {
+  var pt = vec3.create();
+  return function addMesh(vbo, vbo2) {
+    var baseIndex = vbo.numVertices;
+    for(var i=0;i<vbo2.numVertices;++i) {
+      vboMesh.getVertex(pt,vbo2,i);
+      vboMesh.addVertex(vbo,pt);
+    }
+    
+    for(var i=0;i<vbo2.numIndices;++i) {
+      vboMesh.addIndex(vbo,vbo2.indexData[i]+baseIndex);
+    }
+  }
+})();
+
+vboMesh.addMeshTransform = (function() {
+  var pt = vec3.create();
+  return function addMesh(vbo, vbo2, trans) {
+    var baseIndex = vbo.numVertices;
+    for(var i=0;i<vbo2.numVertices;++i) {
+      vboMesh.getVertex(pt,vbo2,i);
+      vec3.transformMat4(pt,pt,trans);
+      vboMesh.addVertex(vbo,pt);
+    }
+    
+    for(var i=0;i<vbo2.numIndices;++i) {
+      vboMesh.addIndex(vbo,vbo2.indexData[i]+baseIndex);
+    }
+  }
+})();
+
 vboMesh.buffer = function(vbo) {
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo.vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER,vbo.vertexData,gl.STREAM_DRAW);

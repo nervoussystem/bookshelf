@@ -174,10 +174,12 @@ var centroidal = (function() {
         vec2.scale(centroid,centroid,1.0/totalArea/3.0);
         var dx = Math.min(Math.max(Math.random(.1),centroid[0]),width-Math.random(.1))-pt.x;
         var dy = Math.min(Math.max(Math.random(.1),centroid[1]),height-Math.random(.1))-pt.y;
+        var weight = Math.abs(20000.0/totalArea);
+        weight = Math.min(weight,0.5);
         if(dx*dx+dy*dy > 16) {
-          pt.x += .25*dx;
-          pt.y += .25*dy;
-          }
+          pt.x += weight*dx;
+          pt.y += weight*dy;
+        }
       }
     }
   }
