@@ -8,6 +8,8 @@ var voronoi = require('./voronoi.js');
 var vboMesh = require('./vboMesh.js');
 var connector = require('./connector.js');
 var pointer = require('../js/pointer.js');
+var gui = require('./gui.js');
+
 var vec2 = glMatrix.vec2;
 var vec3 = glMatrix.vec3;
 var mat4 = glMatrix.mat4;
@@ -47,6 +49,8 @@ function init() {
   voronoiEdges = vboMesh.create();
   connectorVbo = vboMesh.create32();
   requestAnimationFrame(step);
+  
+  gui.init();
 }
 
 init();
