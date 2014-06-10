@@ -27,7 +27,7 @@ var connectorVbo;
 var shelfWidth = 1200;
 var shelfHeight = 1800;
 
-var minimumShelf = 105;
+var minimumShelf = 85;//105;
 var selectedPt = -1;
 
 function init() {
@@ -79,6 +79,7 @@ function draw2d() {
   ctx.scale(scaling,scaling);
   drawCells2d();
   //drawEdges2d();
+  //drawTriangles2d();
   drawNodes2d();
   ctx.restore();
   
@@ -108,6 +109,25 @@ function drawEdges2d() {
   ctx.stroke();
 }
 
+function drawTriangles2d() {
+  
+  ctx.strokeStyle = "black";
+  for(var i=0;i<voronoi.triangles.length;++i) {
+  ctx.beginPath();
+    var tri = voronoi.triangles[i];
+    if(tri.new1)   ctx.strokeStyle = "red";
+    else if(tri.new2)   ctx.strokeStyle = "green";
+    else ctx.strokeStyle = "black";
+    
+    ctx.moveTo(tri.points_[0].x,tri.points_[0].y);
+    ctx.lineTo(tri.points_[1].x,tri.points_[1].y);
+    ctx.lineTo(tri.points_[2].x,tri.points_[2].y);
+    ctx.lineTo(tri.points_[0].x,tri.points_[0].y);
+
+  ctx.stroke();
+  }
+}
+
 function drawCells2d() {
   
   ctx.strokeStyle = "black";
@@ -128,18 +148,20 @@ function drawCells2d() {
   */
   for(var i=0;i<voronoi.mesh.faces.length;++i) {
     var f = voronoi.mesh.faces[i];
-    var e = f.e;
-    var startE = e;
-    ctx.beginPath();
-    
-    ctx.moveTo(e.v.pos[0],e.v.pos[1]);
-    e = e.next;
-    do {
-      ctx.lineTo(e.v.pos[0],e.v.pos[1]);
+    if(f.on) {
+      var e = f.e;
+      var startE = e;
+      ctx.beginPath();
+      
+      ctx.moveTo(e.v.pos[0],e.v.pos[1]);
       e = e.next;
-    } while(e != startE);
-    ctx.closePath();
-    ctx.stroke();
+      do {
+        ctx.lineTo(e.v.pos[0],e.v.pos[1]);
+        e = e.next;
+      } while(e != startE);
+      ctx.closePath();
+      ctx.stroke();
+    }
   }
 }
 
@@ -149,6 +171,8 @@ function drawNodes2d() {
     var pt = voronoi.pts[i];
     if(selectedPt == i) {
       ctx.fillStyle = "red";
+    } else if(pt.boundary) {
+      ctx.fillStyle = "blue";        
     } else {
       ctx.fillStyle = "black";    
     }
@@ -194,16 +218,16 @@ function voronoiToEdgeVBO() {
   vboMesh.clear(voronoiEdges);
   for(var i=0;i<voronoi.triangles.length;++i) {
     var tri = voronoi.triangles[i];
-    if(tri.interior_) {
-      if(tri.neighbors_[0] && tri.neighbors_[0].interior_) {
+    if(false || tri.interior_) {
+      if(tri.neighbors_[0] && (false || tri.neighbors_[0].interior_)) {
         vboMesh.addVertex(voronoiEdges,tri.circumcenter);
         vboMesh.addVertex(voronoiEdges,tri.neighbors_[0].circumcenter);
       }
-      if(tri.neighbors_[1] && tri.neighbors_[1].interior_) {
+      if(tri.neighbors_[1] && (false || tri.neighbors_[1].interior_)) {
         vboMesh.addVertex(voronoiEdges,tri.circumcenter);
         vboMesh.addVertex(voronoiEdges,tri.neighbors_[1].circumcenter);
       }
-      if(tri.neighbors_[2] && tri.neighbors_[2].interior_) {
+      if(tri.neighbors_[2] && (false || tri.neighbors_[2].interior_)) {
         vboMesh.addVertex(voronoiEdges,tri.circumcenter);
         vboMesh.addVertex(voronoiEdges,tri.neighbors_[2].circumcenter);
       }
@@ -372,9 +396,9 @@ pointer.mouseDragged = (function() {
 
 pointer.mouseClicked = (function() {
   var coords = vec2.create();
-  return function mouseClicked() {
-    if(selectedPt == -1) {
-      var pt = {x:0,y:0};
+  return function mouseClicked(event) {
+    if(selectedPt == -1 && pointer.mouseButton == 1) {
+      var pt = {x:0,y:0,on:true};
       screenToReal(pointer.mouseX,pointer.mouseY,coords);
       pt.x = coords[0];
       pt.y = coords[1];
@@ -384,6 +408,11 @@ pointer.mouseClicked = (function() {
       if(pointer.mouseButton == 3) {
         voronoi.pts.splice(selectedPt,1);
         selectedPt = -1;
+      } else if(pointer.mouseButton == 1) {
+        if(event.ctrlKey) {
+          voronoi.pts[selectedPt].on = !voronoi.pts[selectedPt].on;
+
+        }
       }
     }
   }

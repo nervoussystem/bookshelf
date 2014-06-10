@@ -15,30 +15,46 @@ var triangles = [];
 var voroMesh = new hemesh();
 var width = 1200;
 var height = 1200;
+var topOn = true;
+var leftOn = true;
+var bottomOn = true;
+var rightOn = true;
+var eWeight = 1.0;
 function reset() {
   //make regularly spaced points
   pts.length = 0;
   
-  var spacing = width/4;
-  var spacingY = height/4;
-  for(var i=0;i<4;++i) {
-    for(var j=0;j<4;++j) {
-      pts.push({x:i*spacing+j%2*spacing*0.5,y:j*spacingY+spacingY*0.5});
+  var defaultSpacing = 310;
+  var xDivs = Math.floor(width/(defaultSpacing+1));
+  var yDivs = Math.floor(height/(defaultSpacing+1));
+  
+  var spacing = width/xDivs;
+  var spacingY = height/yDivs;
+  for(var i=0;i<xDivs;++i) {
+    for(var j=0;j<yDivs;++j) {
+      pts.push({x:i*spacing+j%2*spacing*0.5+spacing*0.25,y:j*spacingY+spacingY*0.5,on:true});
     }
   }
 }
 
 function init() {
   outsidePts.length = 0;
-  var d = 500;
-  outsidePts.push({x:-d,y:-d,fixed:true});
-  outsidePts.push({x:width*0.5,y:-d,fixed:true});
-  outsidePts.push({x:width+d,y:-d,fixed:true});
-  outsidePts.push({x:width+d,y:height*0.5,fixed:true});
-  outsidePts.push({x:width+d,y:height+d,fixed:true});
-  outsidePts.push({x:width*0.5,y:height+d,fixed:true});
-  outsidePts.push({x:-d,y:height+d,fixed:true});
-  outsidePts.push({x:-d,y:height*0.5,fixed:true});
+  var d = 5000;
+  outsidePts.push({x:0,y:-d,fixed:true,bottom:true});
+  outsidePts.push({x:width*0.5,y:-d,fixed:true,bottom:true});
+  outsidePts.push({x:width,y:-d,fixed:true,bottom:true});
+
+  outsidePts.push({x:width+d,y:0,fixed:true,right:true});
+  outsidePts.push({x:width+d,y:height*0.5,fixed:true,right:true});
+  outsidePts.push({x:width+d,y:height,fixed:true,right:true});
+
+  outsidePts.push({x:width,y:height+d,fixed:true,top:true});
+  outsidePts.push({x:width*0.5,y:height+d,fixed:true,top:true});
+  outsidePts.push({x:0,y:height+d,fixed:true,top:true});
+
+  outsidePts.push({x:-d,y:height,fixed:true,left:true});
+  outsidePts.push({x:-d,y:height*0.5,fixed:true,left:true});
+  outsidePts.push({x:-d,y:0,fixed:true,left:true});
 }
 
 var voronoi = (function() {
@@ -56,18 +72,19 @@ var voronoi = (function() {
     for(var i=0;i<pts.length;++i) {
       pts[i]._p2t_edge_list = null;
       pts[i].cell = null;
+      pts[i].boundary = false;
     }
     
     triangles = triangulation.getTriangles();
     exports.triangles = triangles;
-    
+    //editBoundary();
     for(var i=0;i<triangles.length;++i) {
       var tri = triangles[i];
       tri.circumcenter = vec3.create();
       vec2.set(p1,tri.points_[0].x,tri.points_[0].y);
       vec2.set(p2,tri.points_[1].x,tri.points_[1].y);
       vec2.set(p3,tri.points_[2].x,tri.points_[2].y);
-      circumcircle(tri.circumcenter,p1,p2,p3);
+      tri.area = circumcircle(tri.circumcenter,p1,p2,p3);      
     }
     
     buildCells();
@@ -94,7 +111,7 @@ var circumcircle = (function() {
     out[1] = -v2[0];
     vec2.scale(out,out,0.5/denom);
     vec2.add(out,out,p3);
-    return out;
+    return Math.abs(denom);
   }
 })();
 
@@ -139,26 +156,144 @@ function setDimensions(w,h) {
   height = h;
 }
 
+function editBoundary() {
+  var dir1 = vec2.create();
+  var dir2 = vec2.create();
+  
+  for(var i=0;i<triangles.length;++i) {
+    var t = triangles[i];
+    var boundary = t.points_[0].bottom || t.points_[0].bottom || t.points_[2].bottom ||
+                    t.points_[0].left || t.points_[0].left || t.points_[2].left;
+    if(boundary) {
+      t.points_[0].boundary = true;
+      t.points_[1].boundary = true;
+      t.points_[2].boundary = true;
+
+      /*
+      t.points_[0].newPts = [];
+      t.points_[1].newPts = [];
+      t.points_[2].newPts = [];
+      t.points_[0].newTris = [];
+      t.points_[1].newTris = [];
+      t.points_[2].newTris = [];
+
+      //remove triangle
+      triangles.splice(i,1);
+      i--;
+      //unmark neighbors
+      for(var j=0;j<3;++j) {
+        if(t.neighbors_[j]) {
+          unmarkNeighbor(t.neighbors_[j],t);
+        }
+      }
+      */
+    }
+  }
+  /*
+  for(var i=0,len=triangles.length;i<len;++i) {
+    var t = triangles[i];
+    var bPtCount = 0;
+    var bPts = [];
+    var inPt;
+    for(var j=0;j<3;++j) {
+      if(t.points_[j].boundary) {
+        bPts[bPtCount] = t.points_[j];
+        bPtCount++;
+        
+      } else {
+        inPt = j;
+      }
+    }
+    
+    if(bPtCount==2) {
+      if(inPt == 1) {
+        var temp = bPts[0];
+        bPts[0] = bPts[1];
+        bPts[1] = temp;
+      }
+      inPt = t.points_[inPt];
+      //mirror in pt
+      vec2.set(dir1,bPts[1].x-bPts[0].x,bPts[1].y-bPts[0].y);
+      vec2.set(dir2,inPt.x-bPts[0].x,inPt.y-bPts[0].y);
+      console.log(dir1[0]*dir2[1]-dir1[1]*dir2[0]);
+      vec2.normalize(dir1,dir1);
+      var dot = vec2.dot(dir1,dir2);
+      vec2.scale(dir1,dir1,dot);
+      vec2.sub(dir2,dir1,dir2);
+      vec2.add(dir1,dir1,dir2);
+      var newPt = new poly2tri.Point(dir1[0]+bPts[0].x,dir1[1]+bPts[0].y);
+      newPt.fixed = true;
+      //new triangle
+      var newT = new poly2tri.Triangle(bPts[0],bPts[1],newPt);
+      newT.interior_ = true;
+      newT.new1 = true;
+      newT.markNeighbor(t);
+      triangles.push(newT);
+      
+      bPts[0].newPts.push(newPt);
+      bPts[0].newTris.push(newT);
+      bPts[1].newPts.push(newPt);
+      bPts[1].newTris.push(newT);
+    }
+  }
+  vec2.set(dir1,t.points_[1].x-t.points_[0].x,t.points_[1].y-t.points_[0].y);
+  vec2.set(dir2,t.points_[2].x-t.points_[0].x,t.points_[2].y-t.points_[0].y);
+  console.log(dir1[0]*dir2[1]-dir1[1]*dir2[0]);
+  
+  for(var i=0;i<pts.length;++i) {
+    var pt = pts[i];
+    if(pt.boundary && pt.newPts.length == 2) {
+      var newT = new poly2tri.Triangle(pt,pt.newPts[0],pt.newPts[1]);
+      newT.new2 = true;
+      newT.interior_ = true;
+      newT.markNeighbor(pt.newTris[0]);
+      newT.markNeighbor(pt.newTris[1]);
+      triangles.push(newT);
+    }
+  }
+  */
+}
+
+function unmarkNeighbor(t1,t2) {
+  for(var i=0;i<3;++i) {
+    if(t1.neighbors_[i] === t2) {
+      t1.neighbors_[i] = null;
+    }
+  }
+}
+
+
 var centroidal = (function() {
   var centroid = vec2.create();
+  var centroid2 = vec2.create();
   var center = vec2.create();
   var area,totalArea;
+  var area2,totalArea2;
   var v1,v2;
   return function centroidal() {
     for(var i=0;i<pts.length;++i) {
       var pt = pts[i];
       if(!pt.fixed) {
         totalArea = 0;
+        totalArea2 = 0;
         vec2.set(centroid,0,0);
+        vec2.set(centroid2,0,0);
         var e = pt.cell.e;
         do {
           v1 = e.v.pos;
+          var w = e.v.w;
           e = e.next;
           v2 = e.v.pos;
-          area = v1[0]*v2[1]-v1[1]*v2[0];
-          totalArea += v1[0]*v2[1]-v1[1]*v2[0];
-          centroid[0] += (v1[0]+v2[0])*area;
-          centroid[1] += (v1[1]+v2[1])*area;
+          //w += e.v.w;
+          area = w;//w*((v1[0]*v2[1]-v1[1]*v2[0]));
+          totalArea += area;
+          centroid[0] += area*v1[0];//(v1[0]+v2[0])*area;
+          centroid[1] += area*v1[1];//(v1[1]+v2[1])*area;
+          
+          area2 = ((v1[0]*v2[1]-v1[1]*v2[0]));
+          totalArea2 += area2;
+          centroid2[0] += (v1[0]+v2[0])*area2;
+          centroid2[1] += (v1[1]+v2[1])*area2;
         } while(e != pt.cell.e);
         /*
         for(var j=0,l=pt.cell.length;j<l;++j) {
@@ -171,19 +306,21 @@ var centroidal = (function() {
           centroid[1] += (v1[1]+v2[1])*area;
         }
         */
-        vec2.scale(centroid,centroid,1.0/totalArea/3.0);
+        totalArea2 *= 3;
+        vec2.scale(centroid,centroid,1.0/totalArea);
+        vec2.scale(centroid2,centroid2,1.0/totalArea2);
+        vec2.lerp(centroid,centroid,centroid2,0.25);
         var dx = Math.min(Math.max(Math.random(.1),centroid[0]),width-Math.random(.1))-pt.x;
         var dy = Math.min(Math.max(Math.random(.1),centroid[1]),height-Math.random(.1))-pt.y;
-        var weight = Math.abs(20000.0/totalArea);
-        weight = Math.min(weight,0.5);
         if(dx*dx+dy*dy > 16) {
-          pt.x += weight*dx;
-          pt.y += weight*dy;
+          pt.x += dx*.25;
+          pt.y += dy*.25;
         }
       }
     }
   }
 })();
+
 
 var ptToEdge = [];
 var buildCells = function() {
@@ -192,13 +329,18 @@ var buildCells = function() {
   for(var i=0;i<triangles.length;++i) {
     var t = triangles[i];
     var v = voroMesh.addVertex(t.circumcenter);
+    v.w = 1.0;//1.0+1.0/Math.sqrt(t.area);
     t.v = v;
+    t.bottom = t.points_[0].bottom || t.points_[1].bottom || t.points_[2].bottom;
+    t.top = t.points_[0].top || t.points_[1].top || t.points_[2].top;
+    t.left = t.points_[0].left || t.points_[1].left || t.points_[2].left;
+    t.right = t.points_[0].right || t.points_[1].right || t.points_[2].right;
   }
   for(var i=0;i<triangles.length;++i) {
     var t = triangles[i];
     for(var j=0;j<3;++j) {
       var pt = t.points_[j];
-      if(!pt.fixed) {
+      if(!pt.fixed && !pt.boundary) {
         if(!pt.cell){
           buildCell(pt,t);
         }
@@ -209,11 +351,18 @@ var buildCells = function() {
 }
 
 function buildCell(pt,t) {
-  pt.cell = voroMesh.addFace();
   var prevV = t.v;
   t = t.neighborCCW(pt);
   var startT = t;
   var e, prevE = null;
+  var left,right,top,bottom;
+  left = right = top = bottom = false;
+  do {
+    if(t.left || t.bottom) return;
+  } while(t != startT);
+
+  pt.cell = voroMesh.addFace();
+  pt.cell.on = pt.on;
   do {
     //pt.cell.push(t.circumcenter);
     e = voroMesh.addEdge();
@@ -294,12 +443,27 @@ function makeBoundaryEdges(mesh,ptToEdge) {
 }
 
 function isInside(pt) {
-  return pt[0] > 0 && pt[0] < width && pt[1] > 0 && pt[1] < height;
+  var insideVal = 1;
+  if(pt[0] >= width) {
+    insideVal = Math.min(insideVal, rightOn ? 0 : -1);
+  }
+  if(pt[0] <= 0) {
+    insideVal = Math.min(insideVal, leftOn ? 0 : -1);
+  }
+  if(pt[1] >= height) {
+    insideVal = Math.min(insideVal, topOn ? 0 : -1);
+  }
+  if(pt[1] <= 0) {
+    insideVal = Math.min(insideVal, bottomOn ? 0 : -1);
+  }
+  return insideVal;
+  //return pt[0] > 0 && pt[0] < width && pt[1] > 0 && pt[1] < height;
 }
 
-var trimEdge = (function() {
+var trimEdge = (function() {  
   var dir = vec2.create();
   return function trimEdge(out,inP,outP) {
+  
     vec2.sub(dir,outP,inP);
     if(outP[0] < 0) {
       if(outP[1] <0) {
@@ -354,6 +518,7 @@ var trimCells = (function() {
     }
   }
 })();
+
 var trimFace = (function() {
   var trimPt = vec3.create();
   var v,e, startE, prevE;
@@ -365,16 +530,18 @@ var trimFace = (function() {
     //watchout for infinite loop (not done)
     do {
       e = e.next;
-    } while(!isInside(e.v.pos) && e != startE);
+    } while(isInside(e.v.pos) <= 0 && e != startE);
     startE = e;
     //find first outside pt
     do {
       
       prevE = e;
       e = e.next;
-    } while(isInside(e.v.pos) && e != startE);
+    } while(isInside(e.v.pos) > 0 && e != startE);
     
-    if(isInside(e.v.pos)) { return; }
+    if(isInside(e.v.pos) > 0) { return; }
+    
+    if(isInside(e.v.pos) < 0) f.on = false;
     
     startE = e;
     f.e = e;      
@@ -387,6 +554,7 @@ var trimFace = (function() {
       //make new trimmed vertex and point to that
       trimEdge(trimPt, e.pair.v.pos, e.v.pos);
       newV = voroMesh.addVertex(trimPt);
+      newV.w = eWeight;//0.5;
       newV.b = true;
       newV.e = e;
       e.v.e = null;
@@ -395,7 +563,8 @@ var trimFace = (function() {
     }
     
     e = e.next;
-    while(!isInside(e.v.pos)) {
+    while(isInside(e.v.pos) <= 0 && e != startE) {
+      if(isInside(e.v.pos) < 0) f.on = false;
       e.v.e = null;
       e = e.next;
     }    
@@ -407,27 +576,29 @@ var trimFace = (function() {
       //make new trimmed vertex and point to that
       trimEdge(trimPt,  e.v.pos,e.pair.v.pos);
       newV = voroMesh.addVertex(trimPt);
+      newV.w = eWeight;//0.5;
       newV.b = true;
       e.info.trimmed = newV;
     }
     
     // corner
     //may need to check for floating point errors
-    if(startE.v.pos[0] != newV.pos[0] && startE.v.pos[0] != newV.pos[0]) {
+    if(Math.abs(startE.v.pos[0]-newV.pos[0]) > EPSILON && Math.abs(startE.v.pos[0]-newV.pos[0]) > EPSILON) {
       //which corner
-      if(startE.v.pos[0] == 0 || newV.pos[0] == 0) {
+      if(startE.v.pos[0] < EPSILON || newV.pos[0] < EPSILON) {
         trimPt[0] = 0;
-      } else if(startE.v.pos[0] == width || newV.pos[0] == width) {
+      } else if(startE.v.pos[0] > width-EPSILON || newV.pos[0] > width-EPSILON) {
         trimPt[0] = width;
       }
       
-      if(startE.v.pos[1] == 0 || newV.pos[1] == 0) {
+      if(startE.v.pos[1] < EPSILON || newV.pos[1] < EPSILON) {
         trimPt[1] = 0;
-      } else if(startE.v.pos[1] == height || newV.pos[1] == height) {
+      } else if(startE.v.pos[1] > height-EPSILON || newV.pos[1] > height-EPSILON) {
         trimPt[1] = height;
       }
       //add corner
       var cornerV = voroMesh.addVertex(trimPt);
+      cornerV.w = eWeight;//0.5;
       var newE = voroMesh.addEdge();
       var newEP = voroMesh.addEdge();
       var newE2 = voroMesh.addEdge();

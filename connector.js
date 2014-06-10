@@ -15,6 +15,7 @@ var conWidth = 12;//20
 var shelfOffset = 12;
 var printTolerance = 0;
 var labelHeight = 5;
+var filletRadius = 9;
 
 var connectorTris = [];
 function initConnector(gl) {
@@ -53,15 +54,18 @@ var createConnector = (function() {
     var index = 0;
     do {
       e = e.next;
-      vec3.sub(dirs[index],e.v.pos,center);
-      len = vec3.len(dirs[index]);
-      vec3.scale(dirs[index],dirs[index],1.0/len);
-      labels[index] = e.info.label;
-      //console.log(e.info.label);
-      lengths[index] = len;
+      if((e.face && e.face.on) || (e.pair.face && e.pair.face.on)) {
+        vec3.sub(dirs[index],e.v.pos,center);
+        len = vec3.len(dirs[index]);
+        vec3.scale(dirs[index],dirs[index],1.0/len);
+        labels[index] = e.info.label;
+        //console.log(e.info.label);
+        lengths[index] = len;
+        index++;
+      }
       e = e.pair;
-      index++;
     } while(e != startE);
+    if(index < 2) return;
     var numLegs = index;
     
     var baseIndex = vboOut.numVertices;
@@ -70,19 +74,26 @@ var createConnector = (function() {
     for(var i=0;i<numLegs;++i) {
       //make points
       dir = dirs[i];
-      nDir = dirs[(i+1)%numLegs];
+      var iNext = (i+1)%numLegs;
+      nDir = dirs[iNext];
       
       cLen = lengths[i]-shelfOffset*2;
       aLen = accuracy * Math.floor(cLen / accuracy);
       lenDiff = (cLen-aLen)*0.5;
+      var cConLen = conLen;
+      cConLen = Math.min(cConLen, aLen*0.9*0.5);
       
       vec2.set(perp,dir[1],-dir[0]);
-      vec3.scaleAndAdd(pt,center, dir, conLen+shelfOffset+lenDiff);
+      vec3.scaleAndAdd(pt,center, dir, cConLen+shelfOffset+lenDiff);
       vec2.scaleAndAdd(pt,pt,perp,woodWidth*0.5+printTolerance);      
-      addConnectorPt(vboOut,pt);
+      //addConnectorPt(vboOut,pt);
+      vboMesh.addVertex(vboOut,pt);
+      vec2.scaleAndAdd(pt2,pt,dir,-filletRadius);
+      pt2[2] = conWidth;
+      vboMesh.addVertex(vboOut,pt2);
       numPts++;
       
-      vec2.scaleAndAdd(pt,pt,dir,-conLen);
+      vec2.scaleAndAdd(pt,pt,dir,-cConLen);
       addConnectorPt(vboOut,pt);
       numPts++;
       
@@ -93,18 +104,28 @@ var createConnector = (function() {
       
       //make curve
       var crv = nurbs.createCrv(null, 2);
+      var crvTop = nurbs.createCrv(null, 2);
       
-      vec2.scaleAndAdd(pt,pt,dir,conLen);
-      addConnectorPt(vboOut,pt);
+      vec2.scaleAndAdd(pt,pt,dir,cConLen);
+      //addConnectorPt(vboOut,pt);
+      vboMesh.addVertex(vboOut,pt);
+      vec2.scaleAndAdd(pt2,pt,dir,-filletRadius);
+      pt2[2] = conWidth;
+      vboMesh.addVertex(vboOut,pt2);
+
+      
       numPts++;
       
       nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
 
       vec2.scaleAndAdd(pt,pt,perp,-conOffset);
+      vec2.scaleAndAdd(pt2,pt2,perp,-conOffset+filletRadius);
       //addConnectorPt(vboOut,pt);
       //numPts++;
 
       nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
       
       //get offset
       bisector[0] = dir[0]-nDir[0];
@@ -116,31 +137,49 @@ var createConnector = (function() {
       bisector[1] = temp;
       var sinA = Math.abs(bisector[0]*dir[1]-bisector[1]*dir[0]);
       vec3.scaleAndAdd(pt,center,bisector,(woodWidth*0.5+conOffset)/sinA);
+      vec2.scaleAndAdd(pt2,center,bisector,(woodWidth*0.5+(conOffset-filletRadius))/sinA);
 
       nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
       
       //addConnectorPt(vboOut,pt);
       //numPts++;
       
+      //deal with next leg
+      cLen = lengths[iNext]-shelfOffset*2;
+      aLen = accuracy * Math.floor(cLen / accuracy);
+      lenDiff = (cLen-aLen)*0.5;
+      cConLen = Math.min(conLen, aLen*0.9*0.5);
+
       vec2.set(perp,nDir[1],-nDir[0]);
-      vec3.scaleAndAdd(pt,center, nDir, conLen+shelfOffset+lenDiff);
+      vec3.scaleAndAdd(pt,center, nDir, cConLen+shelfOffset+lenDiff);
       vec2.scaleAndAdd(pt,pt,perp,woodWidth*0.5+printTolerance+conOffset);      
+      vec2.scaleAndAdd(pt2,pt,perp,-filletRadius);
+      vec2.scaleAndAdd(pt2,pt2,nDir,-filletRadius);
       
       nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
       vec2.scaleAndAdd(pt,pt,perp,-conOffset);      
+      vec2.scaleAndAdd(pt2,pt2,perp,-(conOffset-filletRadius));      
       nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
       
       var domain = nurbs.domain(crv);
       for(var j=1;j<20;++j) {
         var u = j/20.0*(domain[1]-domain[0])+domain[0];
         nurbs.evaluateCrv(crv,u,pt);
-        addConnectorPt(vboOut,pt);
+        nurbs.evaluateCrv(crvTop,u,pt2);
+        //addConnectorPt(vboOut,pt);
+        vboMesh.addVertex(vboOut,pt);
+        vboMesh.addVertex(vboOut,pt2);
+        
         numPts++;
         
       }
       
     }
-    
+    var baseIndex2 = vboOut.numVertices;
+
     //add label holes
     var labelSpace = 1;
     for(var i=0;i<numLegs;++i) {
@@ -151,24 +190,70 @@ var createConnector = (function() {
       vec2.scaleAndAdd(pt,pt,perp,labelHeight);
       addConnectorPt(vboOut,pt);
       
-      vec2.scaleAndAdd(pt,pt,perp,-labelHeight*2);
+      vec2.scaleAndAdd(pt,pt,perp,-labelHeight);
+      addConnectorPt(vboOut,pt);
+
+      vec2.scaleAndAdd(pt,pt,perp,-labelHeight);
       addConnectorPt(vboOut,pt);
       
       vec2.scaleAndAdd(pt,pt,dir,-labelHeight);
       addConnectorPt(vboOut,pt);
       
-      vec2.scaleAndAdd(pt,pt,perp,labelHeight*2);
+      vec2.scaleAndAdd(pt,pt,perp,labelHeight);
       addConnectorPt(vboOut,pt);
-      vec3.copy(labelsPt[i],pt);
-      
+
+      vec2.scaleAndAdd(pt,pt,perp,labelHeight);
+      addConnectorPt(vboOut,pt);
+      vec3.copy(labelsPt[i],pt);  
     }
     
+    var baseIndex3 = vboOut.numVertices;
     //stitch sides
+    /*
     for(var i=0;i<numPts;++i) {
       var iNext = (i+1)%numPts;
       vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex+iNext*2+1,baseIndex+i*2+1);
       vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex+iNext*2,baseIndex+iNext*2+1);
     }
+    */
+    var divs = 4;
+    for(var i=0;i<numPts;++i) {
+      var iNext = (i+1)%numPts;
+      vboMesh.getVertex(pt,vboOut,baseIndex+i*2);
+      vboMesh.getVertex(pt2,vboOut,baseIndex+i*2+1);
+      vec2.sub(perp,pt,pt2);
+      
+      vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex3+iNext*divs,baseIndex3+i*divs);
+      vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex+iNext*2,baseIndex3+iNext*divs);
+      for(var j=0;j<divs;++j) {
+        var angle = (j+1)*Math.PI*0.5/(divs+1);
+        //redundant could precompute
+        var cosA = Math.cos(angle);
+        var sinA = Math.sin(angle);
+        vec2.scaleAndAdd(pt,pt2,perp,cosA);
+        pt[2] = sinA*pt2[2];
+        
+        vboMesh.addVertex(vboOut,pt);
+        if(j<divs-1) {
+          vboMesh.addTriangle(vboOut,baseIndex3+i*divs+j,baseIndex3+iNext*divs+j+1,baseIndex3+i*divs+j+1);
+          vboMesh.addTriangle(vboOut,baseIndex3+i*divs+j,baseIndex3+iNext*divs+j,baseIndex3+iNext*divs+j+1);
+        }
+
+      }
+      vboMesh.addTriangle(vboOut,baseIndex3+i*divs+divs-1,baseIndex+iNext*2+1,baseIndex+i*2+1);
+      vboMesh.addTriangle(vboOut,baseIndex3+i*divs+divs-1,baseIndex3+iNext*divs+divs-1,baseIndex+iNext*2+1);
+    }
+    
+    //cover top hole
+    for(var i=0;i<numLegs;++i) {
+      vboMesh.addTriangle(vboOut, baseIndex2+i*12+1,baseIndex2+i*12+3,baseIndex2+i*12+9);
+      vboMesh.addTriangle(vboOut, baseIndex2+i*12+1,baseIndex2+i*12+9,baseIndex2+i*12+11);
+
+      vboMesh.addTriangle(vboOut, baseIndex2+i*12+3,baseIndex2+i*12+5,baseIndex2+i*12+7);
+      vboMesh.addTriangle(vboOut, baseIndex2+i*12+3,baseIndex2+i*12+7,baseIndex2+i*12+9);
+
+    }
+    
     //stitch faces
     var faceVbo = connectorTris[numLegs];
     for(var i=0;i<faceVbo.numIndices;) {
@@ -182,8 +267,8 @@ var createConnector = (function() {
     //add labels
     for(var i=0;i<numLegs;++i) {
       dir = dirs[i];
-      var tens = Math.floor(labels[i]/10);
-      var ones = Math.round(labels[i]-tens*10);
+      var tens = Math.floor(labels[i]/10)%10;
+      var ones = labels[i]%10;
       mat4.identity(trans);
       mat4.translate(trans,trans,labelsPt[i]);
       var angle = Math.atan2(-dir[0],dir[1]);
@@ -316,7 +401,12 @@ var makeConnectorSkeleton = (function() {
       vboMesh.addVertex(vboOut,pt);
       numPts++;
       
-      vec2.scaleAndAdd(pt,pt,perp,-labelHeight*2);
+      vec2.scaleAndAdd(pt,pt,perp,-labelHeight);
+      innerCrvs[i].push({x:pt[0],y:pt[1],index:numPts});
+      vboMesh.addVertex(vboOut,pt);
+      numPts++;
+
+      vec2.scaleAndAdd(pt,pt,perp,-labelHeight);
       innerCrvs[i].push({x:pt[0],y:pt[1],index:numPts});
       vboMesh.addVertex(vboOut,pt);
       numPts++;
@@ -326,7 +416,12 @@ var makeConnectorSkeleton = (function() {
       vboMesh.addVertex(vboOut,pt);
       numPts++;
       
-      vec2.scaleAndAdd(pt,pt,perp,labelHeight*2);
+      vec2.scaleAndAdd(pt,pt,perp,labelHeight);
+      innerCrvs[i].push({x:pt[0],y:pt[1],index:numPts});
+      vboMesh.addVertex(vboOut,pt);
+      numPts++;
+
+      vec2.scaleAndAdd(pt,pt,perp,labelHeight);
       innerCrvs[i].push({x:pt[0],y:pt[1],index:numPts});
       vboMesh.addVertex(vboOut,pt);
       numPts++;
