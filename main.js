@@ -9,6 +9,7 @@ var vboMesh = require('./vboMesh.js');
 var connector = require('./connector.js');
 var pointer = require('../js/pointer.js');
 var camera = require('./camera.js');
+var gui = require('./gui.js');
 var vec2 = glMatrix.vec2;
 var vec3 = glMatrix.vec3;
 var mat4 = glMatrix.mat4;
@@ -59,6 +60,8 @@ function init() {
   vboMesh.enableTexCoord(shelfVbo);
   vboMesh.enableNormals(shelfVbo);
   requestAnimationFrame(step);
+  
+  gui.init();
 }
 
 init();
