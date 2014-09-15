@@ -764,7 +764,7 @@ function init() {
   vboMesh.enableNormals(shelfVbo);
   requestAnimationFrame(step);
   
-  gui.init();
+  //gui.init();
 }
 
 init();
