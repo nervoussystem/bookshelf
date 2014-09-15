@@ -1,3 +1,5 @@
+"use strict"
+
 var glMatrix = require("../js/gl-matrix-min.js");
 var vec3 = glMatrix.vec3;
 var vec2 = glMatrix.vec2;
@@ -16,6 +18,10 @@ var shelfOffset = 12;
 var printTolerance = 0;
 var labelHeight = 5;
 var filletRadius = 9;
+
+var toothWidth = 2.5;
+var toothDepth = 2.5;
+var toothOffset = 12.25;
 
 var connectorTris = [];
 function initConnector(gl) {
@@ -46,7 +52,7 @@ var createConnector = (function() {
   var bisector = vec3.create();
   var e,startE;
   var trans = mat4.create();
-  var cLen, aLen, lenDiff;
+  var cLen, aLen, lenDiff, len;
   return function createConnector(v,vboOut) {
     startE = v.e;
     e = startE;
@@ -93,7 +99,25 @@ var createConnector = (function() {
       vboMesh.addVertex(vboOut,pt2);
       numPts++;
       
-      vec2.scaleAndAdd(pt,pt,dir,-cConLen);
+      //tooth
+      vec2.scaleAndAdd(pt,pt,dir,-cConLen+toothOffset+toothWidth);      
+      addConnectorPt(vboOut,pt);
+      numPts++;
+
+      vec2.scaleAndAdd(pt,pt,perp,-toothDepth);
+      addConnectorPt(vboOut,pt);
+      numPts++;
+      
+      vec2.scaleAndAdd(pt,pt,dir,-toothWidth);
+      addConnectorPt(vboOut,pt);
+      numPts++;
+      
+      vec2.scaleAndAdd(pt,pt,perp,toothDepth);
+      addConnectorPt(vboOut,pt);
+      numPts++;
+            
+      //end tooth
+      vec2.scaleAndAdd(pt,pt,dir,-toothOffset); //cConLet
       addConnectorPt(vboOut,pt);
       numPts++;
       
@@ -324,7 +348,28 @@ var makeConnectorSkeleton = (function() {
       vboMesh.addVertex(vboOut,pt);
       numPts++;
       
-      vec2.scaleAndAdd(pt,pt,dir,-conLen);
+      //tooth
+      vec2.scaleAndAdd(pt,pt,dir,-conLen+toothOffset+toothWidth);      
+      outsidePts.push({x:pt[0],y:pt[1],index:numPts});
+      vboMesh.addVertex(vboOut,pt);
+      numPts++;
+
+      vec2.scaleAndAdd(pt,pt,perp,-toothDepth);
+      outsidePts.push({x:pt[0],y:pt[1],index:numPts});
+      vboMesh.addVertex(vboOut,pt);
+      numPts++;
+      
+      vec2.scaleAndAdd(pt,pt,dir,-toothWidth);
+      outsidePts.push({x:pt[0],y:pt[1],index:numPts});
+      vboMesh.addVertex(vboOut,pt);
+      numPts++;
+      
+      vec2.scaleAndAdd(pt,pt,perp,toothDepth);
+      outsidePts.push({x:pt[0],y:pt[1],index:numPts});
+      vboMesh.addVertex(vboOut,pt);
+      numPts++;
+      
+      vec2.scaleAndAdd(pt,pt,dir,-toothOffset);
       outsidePts.push({x:pt[0],y:pt[1],index:numPts});
       vboMesh.addVertex(vboOut,pt);
       numPts++;
@@ -449,6 +494,14 @@ function addConnectorPt(vboOut,pt) {
   pt[2] = 0;
 }
 
+var getShelfLength = function(e) {
+  var len = vec2.dist(e.v.pos,e.pair.v.pos);
+  var cLen = len-shelfOffset*2;
+  var aLen = accuracy * Math.floor(cLen / accuracy);
+  return aLen;
+}
+
+exports.getShelfLength = getShelfLength;
 exports.createConnector = createConnector;
 exports.initConnector = initConnector;
 exports.shelfOffset = shelfOffset;

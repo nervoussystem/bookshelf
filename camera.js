@@ -26,6 +26,7 @@ NScamera.minDistance = 5;
 NScamera.fixX = false;
 NScamera.fixY = false;
 NScamera.fixZ = false;
+NScamera.screenCenter = [0,0];
 vec3.angle = function(v1,v2) {
 	return Math.acos(vec3.dot(v1,v2)/(vec3.length(v1)*vec3.length(v2)));
 }
@@ -84,7 +85,7 @@ NScamera.pan = function(dx,dy) {
 NScamera.mouseRotate = function(dx,dy,mx,my) {
 	var u = [0,0,-100*.6*this.startDistance]; //this.distance?
 
-	var rho = Math.abs((gl.viewportWidth / 2.0) - mx) / (gl.viewportWidth/2.0);
+	var rho = Math.abs(this.screenCenter[0] - mx) / 800;
 	var adz = Math.abs(dy) * rho;
 	var ady = Math.abs(dy) * (1 - rho);
 	var ySign = dy < 0 ? -1 : 1;
@@ -94,11 +95,11 @@ NScamera.mouseRotate = function(dx,dy,mx,my) {
 	var vz = vec3.create(); //avoid
 	vec3.add(vz,u,[0,adz,0]);
 	this.velocityZ += vec3.angle(u, vz) * -ySign
-			* (mx < gl.viewportWidth / 2 ? -1 : 1);
+			* (mx < this.screenCenter[0] / 2 ? -1 : 1);
 
 
-	var eccentricity = Math.abs((gl.viewportHeight / 2.0) - my)
-			/ (gl.viewportHeight / 2.0);
+	var eccentricity = Math.abs(this.screenCenter[1] - my)
+			/ 800;
 	var xSign = dx > 0 ? -1 : 1;
 	adz = Math.abs(dx) * eccentricity;
 	var adx = Math.abs(dx) * (1 - eccentricity);
@@ -107,7 +108,7 @@ NScamera.mouseRotate = function(dx,dy,mx,my) {
 	this.velocityY += vec3.angle(u,vx)*xSign;
 	vec3.add(vz,u,[0,adz,0]);
 	this.velocityZ += vec3.angle(u,vz)*xSign
-		* (my > gl.viewportHeight / 2 ? -1 : 1);
+		* (my > this.screenCenter[1] ? -1 : 1);
 	
 }
 

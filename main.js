@@ -8,6 +8,7 @@ var voronoi = require('./voronoi.js');
 var vboMesh = require('./vboMesh.js');
 var connector = require('./connector.js');
 var pointer = require('../js/pointer.js');
+var camera = require('./camera.js');
 var vec2 = glMatrix.vec2;
 var vec3 = glMatrix.vec3;
 var mat4 = glMatrix.mat4;
@@ -23,12 +24,18 @@ var mvMatrix = mat4.create();
 var pMatrix = mat4.create();
 var nMatrix = mat3.create();
 var connectorVbo;
+var shelfVbo;
 
 var shelfWidth = 1200;
 var shelfHeight = 1800;
+var shelfDepth = 254;
+
+var woodWidth = 12.2;
 
 var minimumShelf = 85;//105;
 var selectedPt = -1;
+
+var window2dWidth = 800;
 
 function init() {
 //stupid
@@ -36,9 +43,11 @@ function init() {
 
   canvas = document.getElementById("gl");
   canvas2d = document.getElementById("2d");
-  pointer.setupMouseEvents(canvas2d);
+  pointer.setupMouseEvents(canvas);
+  camera.screenCenter = [1200,400];
   ctx = canvas2d.getContext('2d');
   gl = glUtils.init(canvas);
+  setupGui();
   colorShader = glShader.loadShader(gl,"../shaders/simpleColor.vert","../shaders/simpleColor.frag");
   vboMesh.setGL(gl);
   initVoronoi();
@@ -46,6 +55,9 @@ function init() {
   
   voronoiEdges = vboMesh.create();
   connectorVbo = vboMesh.create32();
+  shelfVbo = vboMesh.create();
+  vboMesh.enableTexCoord(shelfVbo);
+  vboMesh.enableNormals(shelfVbo);
   requestAnimationFrame(step);
 }
 
@@ -54,6 +66,7 @@ init();
 
 function step() {
   requestAnimationFrame(step);
+  camera.step();
   checkHover();
   dragHover();
   vboMesh.clear(connectorVbo);
@@ -64,11 +77,12 @@ function step() {
   fixShelves();
   fixShelves();
   getConnectors();
+  drawShelves();
   draw();
 }
 
 function draw() {
-  draw2d();
+  //draw2d();
   draw3d();
 }
 
@@ -184,13 +198,137 @@ function drawNodes2d() {
   
 }
 
+function drawShelves() {
+  vboMesh.clear(shelfVbo);
+  for(var i=0;i<voronoi.mesh.edges.length;++i) {
+    var e = voronoi.mesh.edges[i];
+    if(e.v.e) {
+      drawShelf(shelfVbo,e);
+    }
+  }
+  vboMesh.buffer(shelfVbo);
+}
+
+var drawShelf = (function() {
+  var center = vec3.create();
+  var dir = vec3.create();
+  var perp = vec3.create();
+  var pts = new Array(8);
+  for(var i=0;i<pts.length;++i) pts[i] = vec3.create();
+  return function drawShelf(vboOut, e) {
+    var length = connector.getShelfLength(e);
+    vec3.add(center,e.v.pos,e.pair.v.pos);
+    vec3.scale(center,center,0.5);
+    vec3.sub(dir,e.v.pos,e.pair.v.pos);
+    vec3.normalize(dir,dir);
+    vec3.set(perp,dir[1],-dir[0],0);
+
+    //top
+    vec3.scaleAndAdd(pts[0],center,dir,length*0.5);
+    vec3.scaleAndAdd(pts[0],pts[0],perp,woodWidth*0.5);
+    vec3.copy(pts[1],pts[0]);
+    pts[1][2] = shelfDepth;
+    
+    vec3.scaleAndAdd(pts[3],center,dir,-length*0.5);
+    vec3.scaleAndAdd(pts[3],pts[3],perp,woodWidth*0.5);
+    vec3.copy(pts[2],pts[3]);
+    pts[2][2] = shelfDepth;
+
+    addQuadFaceTex(vboOut,pts[0],pts[1],pts[2],pts[3],[length,0],[length,shelfDepth],[0,shelfDepth],[0,0],perp);
+    //bottom
+    vec3.negate(perp,perp);
+
+    vec3.scaleAndAdd(pts[4],center,dir,length*0.5);
+    vec3.scaleAndAdd(pts[4],pts[4],perp,woodWidth*0.5);
+    vec3.copy(pts[5],pts[4]);
+    pts[5][2] = shelfDepth;
+    
+    vec3.scaleAndAdd(pts[7],center,dir,-length*0.5);
+    vec3.scaleAndAdd(pts[7],pts[7],perp,woodWidth*0.5);
+    vec3.copy(pts[6],pts[7]);
+    pts[6][2] = shelfDepth;
+    
+    addQuadFaceTex(vboOut,pts[4],pts[5],pts[6],pts[7],[length,0],[length,shelfDepth],[0,shelfDepth],[0,0],perp);
+    
+    //sides
+    addQuadFaceTex(vboOut,pts[1],pts[5],pts[6],pts[2],[length,0],[length,1],[0,1],[0,0],[0,0,1]);
+    addQuadFaceTex(vboOut,pts[0],pts[4],pts[7],pts[3],[length,0],[length,1],[0,1],[0,0],[0,0,-1]);
+
+    addQuadFaceTex(vboOut,pts[0],pts[1],pts[5],pts[4],[length,0],[length,1],[0,1],[0,0],dir);
+    vec3.negate(dir,dir);
+    addQuadFaceTex(vboOut,pts[3],pts[2],pts[6],pts[7],[length,0],[length,1],[0,1],[0,0],dir);
+    
+  }
+})();
+
+function addQuadFaceTex(vboOut,p1,p2,p3,p4,t1,t2,t3,t4,n) {
+  vboMesh.addVertex(vboOut,p1,n);
+  vboMesh.addTexCoord(vboOut,t1);
+  vboMesh.addVertex(vboOut,p2,n);
+  vboMesh.addTexCoord(vboOut,t2);
+  vboMesh.addVertex(vboOut,p3,n);
+  vboMesh.addTexCoord(vboOut,t3);
+  
+  vboMesh.addVertex(vboOut,p1,n);
+  vboMesh.addTexCoord(vboOut,t1);
+  vboMesh.addVertex(vboOut,p2,n);
+  vboMesh.addTexCoord(vboOut,t2);
+  vboMesh.addVertex(vboOut,p4,n);
+  vboMesh.addTexCoord(vboOut,t4);
+  
+  
+}
+
 function draw3d() {
+  gl.viewport(0,0,1600,800);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   if(!colorShader.isReady) return;
+  draw2dGL();
+  gl.viewport(800,0,800,800);
   
   colorShader.begin();
   mat4.identity(mvMatrix);
-  mat4.ortho(pMatrix,-500,2000,2000,-500,-10,100);
+  mat4.ortho(pMatrix,-500,2000,2000,-500,-2000,2000);
+  camera.feed(mvMatrix);
+  //set color
+  colorShader.uniforms.matColor.set([0,0,0,1]);
+  //set matrices
+  colorShader.uniforms.mvMatrix.set(mvMatrix);
+  colorShader.uniforms.pMatrix.set(pMatrix);
+  
+  //make voronoi edges vbo
+  //voronoiToEdgeVBO();
+  
+  //draw edges vbo
+  //colorShader.attribs.vertexPosition.set(voronoiEdges.vertexBuffer);
+  //gl.drawArrays(gl.LINES, 0,voronoiEdges.numVertices);
+
+  //draw connectors
+  colorShader.attribs.vertexPosition.set(connectorVbo.vertexBuffer);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,connectorVbo.indexBuffer);
+  gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
+
+  mat4.scale(mvMatrix,mvMatrix,[1,1,-1]);
+  mat4.translate(mvMatrix,mvMatrix,[0,0,-shelfDepth]);
+  colorShader.uniforms.mvMatrix.set(mvMatrix);
+  gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
+  
+  //draw shelves
+  colorShader.attribs.vertexPosition.set(shelfVbo.vertexBuffer);
+  gl.drawArrays(gl.TRIANGLES,0,shelfVbo.numVertices);
+  
+  
+  colorShader.end();  
+}
+
+function draw2dGL() {
+  gl.viewport(0,0,800,800);
+  
+  colorShader.begin();
+  mat4.identity(mvMatrix);
+  var scaling = Math.min(window2dWidth/shelfWidth,canvas.offsetHeight/shelfHeight);
+  mat4.scale(mvMatrix,mvMatrix,[scaling,scaling,scaling]);
+  mat4.ortho(pMatrix,0,window2dWidth,canvas.offsetHeight,0,-2000,2000);
   
   //set color
   colorShader.uniforms.matColor.set([0,0,0,1]);
@@ -199,16 +337,21 @@ function draw3d() {
   colorShader.uniforms.pMatrix.set(pMatrix);
   
   //make voronoi edges vbo
-  voronoiToEdgeVBO();
+  //voronoiToEdgeVBO();
   
   //draw edges vbo
-  colorShader.attribs.vertexPosition.set(voronoiEdges.vertexBuffer);
-  gl.drawArrays(gl.LINES, 0,voronoiEdges.numVertices);
+  //colorShader.attribs.vertexPosition.set(voronoiEdges.vertexBuffer);
+  //gl.drawArrays(gl.LINES, 0,voronoiEdges.numVertices);
 
   //draw connectors
   colorShader.attribs.vertexPosition.set(connectorVbo.vertexBuffer);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,connectorVbo.indexBuffer);
   gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
+  
+  //draw shelves
+  colorShader.attribs.vertexPosition.set(shelfVbo.vertexBuffer);
+  gl.drawArrays(gl.TRIANGLES,0,shelfVbo.numVertices);
+  
   
   colorShader.end();
 }
@@ -314,6 +457,28 @@ function keyPress(event) {
   }
 }
 
+function setupGui() {
+  var widthSlide = document.getElementById("width");
+  widthSlide.oninput = function() {setWidth(parseFloat(this.value));}
+  var heightSlide = document.getElementById("height");
+  heightSlide.oninput = function() {setHeight(parseFloat(this.value));}
+}
+
+function setWidth(val) {
+  shelfWidth = val;
+  voronoi.setDimensions(shelfWidth,shelfHeight);
+
+  var wDiv = document.getElementById("widthOut");
+  wDiv.innerHTML = val/25.4 + " in";
+}
+
+function setHeight(val) {
+  shelfHeight = val;
+  voronoi.setDimensions(shelfWidth,shelfHeight);
+  var hDiv = document.getElementById("heightOut");
+  hDiv.innerHTML = val/25.4 + " in";
+}
+
 function download() {
   var lenStr = "";
   var lens = [];
@@ -390,28 +555,32 @@ var checkHover = (function() {
 pointer.mouseDragged = (function() {
   var coord = vec2.create();
   return function mouseDragged() {
-    
+    if(pointer.mouseX > window2dWidth) {
+      camera.mouseDragged(pointer.mouseX-pointer.pmouseX,pointer.mouseY-pointer.pmouseY,pointer.mouseX,pointer.mouseY,pointer.mouseButton);
+    }
   }
 })();
 
 pointer.mouseClicked = (function() {
   var coords = vec2.create();
   return function mouseClicked(event) {
-    if(selectedPt == -1 && pointer.mouseButton == 1) {
-      var pt = {x:0,y:0,on:true};
-      screenToReal(pointer.mouseX,pointer.mouseY,coords);
-      pt.x = coords[0];
-      pt.y = coords[1];
-      voronoi.pts.push(pt);
-      selectedPt = voronoi.pts.length-1;
-    } else {
-      if(pointer.mouseButton == 3) {
-        voronoi.pts.splice(selectedPt,1);
-        selectedPt = -1;
-      } else if(pointer.mouseButton == 1) {
-        if(event.ctrlKey) {
-          voronoi.pts[selectedPt].on = !voronoi.pts[selectedPt].on;
+    if(pointer.mouseX < window2dWidth) {
+      if(selectedPt == -1 && pointer.mouseButton == 1) {
+        var pt = {x:0,y:0,on:true};
+        screenToReal(pointer.mouseX,pointer.mouseY,coords);
+        pt.x = coords[0];
+        pt.y = coords[1];
+        voronoi.pts.push(pt);
+        selectedPt = voronoi.pts.length-1;
+      } else {
+        if(pointer.mouseButton == 3) {
+          voronoi.pts.splice(selectedPt,1);
+          selectedPt = -1;
+        } else if(pointer.mouseButton == 1) {
+          if(event.ctrlKey) {
+            voronoi.pts[selectedPt].on = !voronoi.pts[selectedPt].on;
 
+          }
         }
       }
     }

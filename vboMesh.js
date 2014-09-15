@@ -45,6 +45,10 @@ vboMesh.create = function() {
     vbo.colorData= null;
     vbo.normalBuffer = null;
     vbo.colorBuffer = null;
+    vbo.texCoordEnabled = false;
+    vbo.texCoordData = null;
+    vbo.texCoordBuffer = null;
+    vbo.numTexCoords = 0;
     return vbo;
 };
 
@@ -69,6 +73,7 @@ vboMesh.clear = function(vbo) {
     vbo.numVertices = 0;
     vbo.numIndices = 0;
     vbo.numNormals = 0;
+    vbo.numTexCoords = 0;
 }
 
 vboMesh.enableNormals = function(vbo) {
@@ -99,6 +104,20 @@ vboMesh.disableColor = function(vbo) {
     vbo.colorEnabled = false;
 }
 
+vboMesh.enableTexCoord = function(vbo) {
+  if(!vbo.texCoordEnabled) {
+    vbo.texCoordData = new Float32Array(vbo.vertexData.length/3*2);
+    if(vbo.texCoordBuffer === null) vbo.texCoordBuffer = gl.createBuffer();
+    vbo.texCoordEnabled = true;
+  }
+}
+
+vboMesh.disableTexCoord = function(vbo) {
+    vbo.texCoordData = null;
+    if(vbo.texCoordBuffer !== null) gl.deleteBuffer(vbo.texCoordBuffer);
+    vbo.texCoordEnabled = false;
+}
+
 vboMesh.addVertex = function(vbo, v,n) {
     var index = vbo.numVertices*3;
 	if(index >= vbo.vertexData.length) {
@@ -110,7 +129,7 @@ vboMesh.addVertex = function(vbo, v,n) {
         var newData = new Float32Array(vbo.vertexData.length);
         newData.set(vbo.normalData);
         //do i need to explicitly kill the old vertexData?
-        vbo.normalData = newData;
+        vbo.normalData = newData;        
     }
     if(vbo.colorEnabled) {
       var newData = new Uint8Array(vbo.vertexData.length/3*4);
@@ -118,7 +137,14 @@ vboMesh.addVertex = function(vbo, v,n) {
       //do i need to explicitly kill the old vertexData?
       vbo.colorData = newData;
     }
-	}
+    if(vbo.texCoordEnabled) {
+      var newData = new Float32Array(vbo.vertexData.length/3*2);
+      newData.set(vbo.texCoordData);
+      //do i need to explicitly kill the old vertexData?
+      vbo.texCoordData = newData;
+    }
+
+  }
     vbo.vertexData[index] = v[0];
     vbo.vertexData[index+1] = v[1];
     vbo.vertexData[index+2] = v[2];
@@ -126,6 +152,7 @@ vboMesh.addVertex = function(vbo, v,n) {
         vbo.normalData[index] = n[0];
         vbo.normalData[index+1] = n[1];
         vbo.normalData[index+2] = n[2];
+        vbo.numNormals++;
     }
     vbo.numVertices++;
 }
@@ -157,12 +184,32 @@ vboMesh.getNormal = function(n, vbo, i) {
   n[1] = vbo.normalData[i3+1];
   n[2] = vbo.normalData[i3+2];
 }
+
 vboMesh.setColor = function(vbo, i, c) {
   var i4 = i*4;
   vbo.colorData[i4] = c[0];
   vbo.colorData[i4+1] = c[1];
   vbo.colorData[i4+2] = c[2];
   vbo.colorData[i4+3] = c[3] === undefined ? 255 : c[3];
+}
+
+vboMesh.getTexCoord = function(tx, vbo, i) {
+  var i2 = i*2;
+  tx[0] = vbo.texCoordData[i2];
+  tx[1] = vbo.texCoordData[i2+1];
+}
+
+vboMesh.setTexCoord = function(vbo, i, tx) {
+  var i2 = i*2;
+  vbo.texCoordData[i2] = tx[0];
+  vbo.texCoordData[i2+1] = tx[1];
+}
+
+vboMesh.addTexCoord = function(vbo, tx) {
+  var i2 = vbo.numTexCoords*2;
+  vbo.texCoordData[i2] = tx[0];
+  vbo.texCoordData[i2+1] = tx[1];  
+  vbo.numTexCoords++;
 }
 
 vboMesh.addTriangle = function(vbo, i1,i2,i3) {
