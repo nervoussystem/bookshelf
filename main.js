@@ -13,13 +13,14 @@ var gui = require('./gui.js');
 var vec2 = glMatrix.vec2;
 var vec3 = glMatrix.vec3;
 var mat4 = glMatrix.mat4;
-var mat3 = glMatrix.mat4;
+var mat3 = glMatrix.mat3;
 
 var canvas;
 var canvas2d;
 var ctx;
 var gl;
 var colorShader;
+var phongShader;
 var voronoiEdges;
 var mvMatrix = mat4.create();
 var pMatrix = mat4.create();
@@ -50,6 +51,7 @@ function init() {
   gl = glUtils.init(canvas);
   setupGui();
   colorShader = glShader.loadShader(gl,"../shaders/simpleColor.vert","../shaders/simpleColor.frag");
+  phongShader = glShader.loadShader(gl,"../shaders/phongSimple.vert","../shaders/phongSimple.frag");
   vboMesh.setGL(gl);
   initVoronoi();
   connector.initConnector(gl);
@@ -285,19 +287,28 @@ function addQuadFaceTex(vboOut,p1,p2,p3,p4,t1,t2,t3,t4,n) {
 function draw3d() {
   gl.viewport(0,0,1600,800);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  if(!colorShader.isReady) return;
+  gl.enable(gl.DEPTH_TEST);
+  if(!colorShader.isReady || !phongShader.isReady) return;
   draw2dGL();
   gl.viewport(800,0,800,800);
   
-  colorShader.begin();
+  phongShader.begin();
   mat4.identity(mvMatrix);
   mat4.ortho(pMatrix,-500,2000,2000,-500,-2000,2000);
   camera.feed(mvMatrix);
   //set color
-  colorShader.uniforms.matColor.set([0,0,0,1]);
+  phongShader.uniforms.matColor.set([0,0,0,1]);
+  phongShader.uniforms.ambientLightingColor.set([.3,.3,.3]);
+  phongShader.uniforms.directionalDiffuseColor.set([.7,.7,.7]);
+  var lightingDir = [.3,.3,.8];
+  vec3.normalize(lightingDir,lightingDir);
+  phongShader.uniforms.lightingDirection.set([.3,.3,.3]);
+  phongShader.uniforms.materialShininess.set(8);
   //set matrices
-  colorShader.uniforms.mvMatrix.set(mvMatrix);
-  colorShader.uniforms.pMatrix.set(pMatrix);
+  mat3.normalFromMat4(nMatrix,mvMatrix);
+  phongShader.uniforms.mvMatrix.set(mvMatrix);
+  phongShader.uniforms.nMatrix.set(nMatrix);
+  phongShader.uniforms.pMatrix.set(pMatrix);
   
   //make voronoi edges vbo
   //voronoiToEdgeVBO();
@@ -307,21 +318,26 @@ function draw3d() {
   //gl.drawArrays(gl.LINES, 0,voronoiEdges.numVertices);
 
   //draw connectors
-  colorShader.attribs.vertexPosition.set(connectorVbo.vertexBuffer);
+  phongShader.attribs.vertexPosition.set(connectorVbo.vertexBuffer);
+  phongShader.attribs.vertexNormal.set(connectorVbo.normalBuffer);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,connectorVbo.indexBuffer);
   gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
 
   mat4.scale(mvMatrix,mvMatrix,[1,1,-1]);
   mat4.translate(mvMatrix,mvMatrix,[0,0,-shelfDepth]);
-  colorShader.uniforms.mvMatrix.set(mvMatrix);
+  mat3.normalFromMat4(nMatrix,mvMatrix);
+  phongShader.uniforms.mvMatrix.set(mvMatrix);
+  phongShader.uniforms.nMatrix.set(nMatrix);  
   gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
   
   //draw shelves
-  colorShader.attribs.vertexPosition.set(shelfVbo.vertexBuffer);
+  phongShader.uniforms.matColor.set([.4,.2,.2,1]);
+  phongShader.attribs.vertexNormal.set(shelfVbo.normalBuffer);
+  phongShader.attribs.vertexPosition.set(shelfVbo.vertexBuffer);
   gl.drawArrays(gl.TRIANGLES,0,shelfVbo.numVertices);
   
   
-  colorShader.end();  
+  phongShader.end();  
 }
 
 function draw2dGL() {
@@ -411,6 +427,7 @@ function getConnectors() {
       connector.createConnector(v,connectorVbo);
     }
   }
+  vboMesh.computeSmoothNormals(connectorVbo);
   vboMesh.buffer(connectorVbo);
 }
 
