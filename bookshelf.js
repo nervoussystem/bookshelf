@@ -38,10 +38,20 @@ function setHeight(val) {
   voronoi.setDimensions(bookshelf.width,bookshelf.height);
 
 }
+/*
+sets the bookshelf depth
 
+callback for depth slider
+
+@param float val
+	the depth of the bookshelf in mm
+*/
+function setDepth(val) {
+  bookshelf.depth = val;
+}
 
 
 //FUNCTIONS INCLUDED IN EXPORTED MODULE
 exports.setWidth = setWidth;
 exports.setHeight = setHeight;
-
+exports.setDepth = setDepth;

@@ -82,6 +82,7 @@ function step() {
   getConnectors();
   drawShelves();
   draw();
+  gui.setNumCellsUI();
 }
 
 function draw() {
@@ -591,7 +592,8 @@ pointer.mouseClicked = (function() {
           }
         }
       }
-    }
+  
+	}
   }
 })();
 

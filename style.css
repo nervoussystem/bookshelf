@@ -1,0 +1,21 @@
+body {font-family: 'Electrolize', sans-serif;}
+a, a:visited {color:#000;text-decoration:none;font-weight:bold;}
+
+.noSel {-webkit-user-select: none;  
+  -moz-user-select: none;    
+  -ms-user-select: none;      
+  user-select: none;}
+
+.title {font-size:35px;}
+.subtitle {font-size:16px;}
+
+.nervousLogo img {width:60px;margin:5px;}
+.nervousLogo {position:absolute;right:10px;top:10px;width:110px;text-align:center;font-size:13px;}
+
+
+
+.shelfDataTable {width:300px;}
+.shelfData {width:100%;float:left;}
+.shelfData .slider {float:left;}
+.shelfData .dataTitle {text-transform:uppercase;float:left;font-size:.8em;width:50px;}
+.shelfData .dataValue {float:left;font-size:.8em;color: rgb(0,136,255);padding-left:10px;text-align:right;width:50px;}
