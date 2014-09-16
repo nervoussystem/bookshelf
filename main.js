@@ -9,6 +9,7 @@ var vboMesh = require('./vboMesh.js');
 var connector = require('./connector.js');
 var pointer = require('../js/pointer.js');
 var camera = require('./camera.js');
+var bookshelf = require('./bookshelf.js');
 var gui = require('./gui.js');
 var vec2 = glMatrix.vec2;
 var vec3 = glMatrix.vec3;
@@ -28,11 +29,7 @@ var nMatrix = mat3.create();
 var connectorVbo;
 var shelfVbo;
 
-var shelfWidth = 1200;
-var shelfHeight = 1800;
-var shelfDepth = 254;
 
-var woodWidth = 12.2;
 
 var minimumShelf = 85;//105;
 var selectedPt = -1;
@@ -49,7 +46,8 @@ function init() {
   camera.screenCenter = [1200,400];
   ctx = canvas2d.getContext('2d');
   gl = glUtils.init(canvas);
-  setupGui();
+  //setupGui();
+  gui.init();
   colorShader = glShader.loadShader(gl,"../shaders/simpleColor.vert","../shaders/simpleColor.frag");
   phongShader = glShader.loadShader(gl,"../shaders/phongSimple.vert","../shaders/phongSimple.frag");
   vboMesh.setGL(gl);
@@ -93,7 +91,7 @@ function draw() {
 
 function draw2d() {
   ctx.clearRect(0,0,canvas.offsetWidth,canvas.offsetHeight);
-  var scaling = Math.min(canvas.offsetWidth/shelfWidth,canvas.offsetHeight/shelfHeight);
+  var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
   ctx.save();
   ctx.scale(scaling,scaling);
   drawCells2d();
@@ -230,30 +228,30 @@ var drawShelf = (function() {
 
     //top
     vec3.scaleAndAdd(pts[0],center,dir,length*0.5);
-    vec3.scaleAndAdd(pts[0],pts[0],perp,woodWidth*0.5);
+    vec3.scaleAndAdd(pts[0],pts[0],perp,bookshelf.woodWidth*0.5);
     vec3.copy(pts[1],pts[0]);
-    pts[1][2] = shelfDepth;
+    pts[1][2] = bookshelf.depth;
     
     vec3.scaleAndAdd(pts[3],center,dir,-length*0.5);
-    vec3.scaleAndAdd(pts[3],pts[3],perp,woodWidth*0.5);
+    vec3.scaleAndAdd(pts[3],pts[3],perp,bookshelf.woodWidth*0.5);
     vec3.copy(pts[2],pts[3]);
-    pts[2][2] = shelfDepth;
+    pts[2][2] = bookshelf.depth;
 
-    addQuadFaceTex(vboOut,pts[0],pts[1],pts[2],pts[3],[length,0],[length,shelfDepth],[0,shelfDepth],[0,0],perp);
+    addQuadFaceTex(vboOut,pts[0],pts[1],pts[2],pts[3],[length,0],[length,bookshelf.depth],[0,bookshelf.depth],[0,0],perp);
     //bottom
     vec3.negate(perp,perp);
 
     vec3.scaleAndAdd(pts[4],center,dir,length*0.5);
-    vec3.scaleAndAdd(pts[4],pts[4],perp,woodWidth*0.5);
+    vec3.scaleAndAdd(pts[4],pts[4],perp,bookshelf.woodWidth*0.5);
     vec3.copy(pts[5],pts[4]);
-    pts[5][2] = shelfDepth;
+    pts[5][2] = bookshelf.depth;
     
     vec3.scaleAndAdd(pts[7],center,dir,-length*0.5);
-    vec3.scaleAndAdd(pts[7],pts[7],perp,woodWidth*0.5);
+    vec3.scaleAndAdd(pts[7],pts[7],perp,bookshelf.woodWidth*0.5);
     vec3.copy(pts[6],pts[7]);
-    pts[6][2] = shelfDepth;
+    pts[6][2] = bookshelf.depth;
     
-    addQuadFaceTex(vboOut,pts[4],pts[5],pts[6],pts[7],[length,0],[length,shelfDepth],[0,shelfDepth],[0,0],perp);
+    addQuadFaceTex(vboOut,pts[4],pts[5],pts[6],pts[7],[length,0],[length,bookshelf.depth],[0,bookshelf.depth],[0,0],perp);
     
     //sides
     addQuadFaceTex(vboOut,pts[1],pts[5],pts[6],pts[2],[length,0],[length,1],[0,1],[0,0],[0,0,1]);
@@ -297,12 +295,12 @@ function draw3d() {
   mat4.ortho(pMatrix,-500,2000,2000,-500,-2000,2000);
   camera.feed(mvMatrix);
   //set color
-  phongShader.uniforms.matColor.set([0,0,0,1]);
+  phongShader.uniforms.matColor.set([.1,.1,.1,1]);
   phongShader.uniforms.ambientLightingColor.set([.3,.3,.3]);
-  phongShader.uniforms.directionalDiffuseColor.set([.7,.7,.7]);
-  var lightingDir = [.3,.3,.8];
+  phongShader.uniforms.directionalDiffuseColor.set([.7,.7,.7]);//.7
+  var lightingDir = [.3,.3,.8];//[.3,.3,.8];
   vec3.normalize(lightingDir,lightingDir);
-  phongShader.uniforms.lightingDirection.set([.3,.3,.3]);
+  phongShader.uniforms.lightingDirection.set(lightingDir);
   phongShader.uniforms.materialShininess.set(8);
   //set matrices
   mat3.normalFromMat4(nMatrix,mvMatrix);
@@ -324,14 +322,17 @@ function draw3d() {
   gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
 
   mat4.scale(mvMatrix,mvMatrix,[1,1,-1]);
-  mat4.translate(mvMatrix,mvMatrix,[0,0,-shelfDepth]);
+  mat4.translate(mvMatrix,mvMatrix,[0,0,-bookshelf.depth]);
   mat3.normalFromMat4(nMatrix,mvMatrix);
   phongShader.uniforms.mvMatrix.set(mvMatrix);
   phongShader.uniforms.nMatrix.set(nMatrix);  
   gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
   
   //draw shelves
-  phongShader.uniforms.matColor.set([.4,.2,.2,1]);
+  //wood color
+  phongShader.uniforms.matColor.set([229.0/255,204.0/255,164.0/255,1]);
+  //wood is not shiny
+  phongShader.uniforms.materialShininess.set(1);
   phongShader.attribs.vertexNormal.set(shelfVbo.normalBuffer);
   phongShader.attribs.vertexPosition.set(shelfVbo.vertexBuffer);
   gl.drawArrays(gl.TRIANGLES,0,shelfVbo.numVertices);
@@ -345,7 +346,7 @@ function draw2dGL() {
   
   colorShader.begin();
   mat4.identity(mvMatrix);
-  var scaling = Math.min(window2dWidth/shelfWidth,canvas.offsetHeight/shelfHeight);
+  var scaling = Math.min(window2dWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
   mat4.scale(mvMatrix,mvMatrix,[scaling,scaling,scaling]);
   mat4.ortho(pMatrix,0,window2dWidth,canvas.offsetHeight,0,-2000,2000);
   
@@ -462,7 +463,7 @@ function fixShelves() {
 }
 
 function initVoronoi() {
-  voronoi.setDimensions(shelfWidth,shelfHeight);
+  voronoi.setDimensions(bookshelf.width,bookshelf.height);
   voronoi.init();
   voronoi.reset();
   voronoi.voronoi();
@@ -477,27 +478,14 @@ function keyPress(event) {
   }
 }
 
-function setupGui() {
+/*function setupGui() {
   var widthSlide = document.getElementById("width");
-  widthSlide.oninput = function() {setWidth(parseFloat(this.value));}
+  widthSlide.oninput = function() {bookshelf.setWidth(parseFloat(this.value));}
   var heightSlide = document.getElementById("height");
   heightSlide.oninput = function() {setHeight(parseFloat(this.value));}
-}
+}*/
 
-function setWidth(val) {
-  shelfWidth = val;
-  voronoi.setDimensions(shelfWidth,shelfHeight);
 
-  var wDiv = document.getElementById("widthOut");
-  wDiv.innerHTML = val/25.4 + " in";
-}
-
-function setHeight(val) {
-  shelfHeight = val;
-  voronoi.setDimensions(shelfWidth,shelfHeight);
-  var hDiv = document.getElementById("heightOut");
-  hDiv.innerHTML = val/25.4 + " in";
-}
 
 function download() {
   var lenStr = "";
@@ -528,13 +516,13 @@ function download() {
   downloadVboAsSTL(connectorVbo);
 }
 function screenToReal(x,y,out) {
-  var scaling = Math.min(canvas.offsetWidth/shelfWidth,canvas.offsetHeight/shelfHeight);
+  var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
   out[0] = x/scaling;
   out[1] = y/scaling;
 }
 
 function realToScreen(x,y,out) {
-  var scaling = Math.min(canvas.offsetWidth/shelfWidth,canvas.offsetHeight/shelfHeight);
+  var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
   out[0] = x*scaling;
   out[1] = y*scaling;
 }
