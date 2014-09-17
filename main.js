@@ -539,33 +539,59 @@ var screenToReal = (function() {
   var planeDir = vec3.create();
   var ray = vec4.create();
   var invMatrix = mat4.create();
-  var camPos = vec4.create();
+  var ray2 = vec4.create();
   var up = vec3.clone([0,0,1]);
   return function screenToReal(x,y,out) {
-    vec4.set(ray, 2.0*(x-400.0)/800.0-1.0, 1.0-2.0*y/800.0,0.0,1.0);
+    //get camera transform
+    mat4.identity(mvMatrix);
+    camera.feed(mvMatrix);
+
+    vec4.set(ray, 2.0*(x-400.0)/800.0-1.0, 1.0-2.0*y/800.0,-0.3,1.0);
+    vec4.set(ray2, 2.0*(x-400.0)/800.0-1.0, 1.0-2.0*y/800.0,0.3,1.0);
+    mat4.mul(pMatrix,pMatrix,mvMatrix);
     mat4.invert(invMatrix, pMatrix);
     vec4.transformMat4(ray, ray, invMatrix);
+    vec4.transformMat4(ray2, ray2, invMatrix);
 
-    ray[2] = -1.0;
-    ray[3] = 0.0;
-    mat4.invert(invMatrix,mvMatrix);
-    vec4.transformMat4(ray, ray, invMatrix);
-    vec3.normalize(ray,ray);
+    //ray[2] = -1.0;
+    //ray[3] = 0.0;
+    //ray2[2] = -1.0;
+    //ray2[3] = 0.0;
     
-    vec4.set(camPos,0,0,0,1.0);
-    vec4.transformMat4(camPos,camPos,invMatrix);
-    var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
-    out[0] = x/scaling;
-    out[1] = y/scaling;
+    
+    //mat4.invert(invMatrix,mvMatrix);
+    //vec4.transformMat4(ray, ray, invMatrix);
+    //vec4.transformMat4(ray2, ray2, invMatrix);
+    vec3.sub(dir,ray,ray2);
+    vec3.normalize(dir,dir);
+    vec2.scaleAndAdd(out,ray2,dir,(-ray2[2]+bookshelf.depth*0.5)/dir[2]);
+    
+    //var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
+    //out[0] = x/scaling;
+    //out[1] = y/scaling;
   
   }
 })();
 
-function realToScreen(x,y,out) {
-  var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
-  out[0] = x*scaling;
-  out[1] = y*scaling;
-}
+var realToScreen = (function() {
+  var pt = vec3.create();
+  return function realToScreen(x,y,out) {
+    //get camera transform
+    mat4.identity(mvMatrix);
+    camera.feed(mvMatrix);
+
+    mat4.mul(pMatrix,pMatrix,mvMatrix);
+
+    vec3.set(pt,x,y,bookshelf.depth*0.5);
+    vec3.transformMat4(pt,pt,pMatrix);
+    y = 1.0-2.0*y/800.0
+    out[0] = (pt[0]+1.0)*400+400;
+    out[1] = (pt[1]-1.0)*-400;
+    //var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
+    //out[0] = x*scaling;
+    //out[1] = y*scaling;
+  };
+})();
 
 //pointer.mouseMoved = checkHover;
 
@@ -612,7 +638,7 @@ pointer.mouseDragged = (function() {
 pointer.mouseClicked = (function() {
   var coords = vec2.create();
   return function mouseClicked(event) {
-    if(pointer.mouseX < window2dWidth) {
+    //if(pointer.mouseX < window2dWidth) {
       if(selectedPt == -1 && pointer.mouseButton == 1) {
         var pt = {x:0,y:0,on:true};
         screenToReal(pointer.mouseX,pointer.mouseY,coords);
@@ -630,7 +656,7 @@ pointer.mouseClicked = (function() {
 
           }
         }
-      }
+      //}
   
 	}
   }
