@@ -14,7 +14,7 @@ a, a:visited {color:#000;text-decoration:none;font-weight:bold;}
 
 
 
-.shelfDataTable {width:300px;}
+.shelfDataTable {width:300px;float:left;}
 .shelfData {width:100%;float:left;padding: 2px 0 2px 0;}
 .shelfData .slider {float:left;}
 .shelfData .dataTitle {text-transform:uppercase;float:left;font-size:.8em;width:50px;line-height:20px;}
@@ -32,3 +32,11 @@ border: none;
 font-family: 'Electrolize',sans-serif;
 margin: 0;
 }
+
+
+
+.purchase {width:300px;float:left;}
+.purchase .heading {font-size:20px;text-align:center;width:100%;border-bottom:1px solid #ccc;text-transform:uppercase;}
+.purchase .option {width:100px;float:left;}
+.purchase .optionTxt {font-size:.8em;text-align:center;}
+.purchase .optionTitle {text-align:center;}
