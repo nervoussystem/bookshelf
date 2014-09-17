@@ -20,6 +20,8 @@ var leftOn = true;
 var bottomOn = true;
 var rightOn = true;
 var eWeight = 1.0;
+
+var epsilon = 0.00001;
 function reset() {
   //make regularly spaced points
   pts.length = 0;
@@ -406,7 +408,7 @@ function findPair(e,ptToEdge,i1,i2) {
 }
 
 function makeBoundaryEdges(mesh,ptToEdge) {
-  //add boundary edges and unsure every edge has a pair
+  //add boundary edges and ensure every edge has a pair
   var numEdges = mesh.edges.length;
   var e,v,startV;
   for(var i=0;i<numEdges;++i) {
@@ -444,16 +446,16 @@ function makeBoundaryEdges(mesh,ptToEdge) {
 
 function isInside(pt) {
   var insideVal = 1;
-  if(pt[0] >= width) {
+  if(pt[0] >= width-epsilon) {
     insideVal = Math.min(insideVal, rightOn ? 0 : -1);
   }
-  if(pt[0] <= 0) {
+  if(pt[0] <= epsilon) {
     insideVal = Math.min(insideVal, leftOn ? 0 : -1);
   }
-  if(pt[1] >= height) {
+  if(pt[1] >= height-epsilon) {
     insideVal = Math.min(insideVal, topOn ? 0 : -1);
   }
-  if(pt[1] <= 0) {
+  if(pt[1] <= epsilon) {
     insideVal = Math.min(insideVal, bottomOn ? 0 : -1);
   }
   return insideVal;
@@ -507,7 +509,7 @@ var trimEdge = (function() {
   }
 })();
 
-var EPSILON = .00001;
+var EPSILON = 0.00001;
 
 var trimCells = (function() {
   var f;
@@ -583,7 +585,7 @@ var trimFace = (function() {
     
     // corner
     //may need to check for floating point errors
-    if(Math.abs(startE.v.pos[0]-newV.pos[0]) > EPSILON && Math.abs(startE.v.pos[0]-newV.pos[0]) > EPSILON) {
+    if(Math.abs(startE.v.pos[0]-newV.pos[0]) > EPSILON && Math.abs(startE.v.pos[1]-newV.pos[1]) > EPSILON) {
       //which corner
       if(startE.v.pos[0] < EPSILON || newV.pos[0] < EPSILON) {
         trimPt[0] = 0;
