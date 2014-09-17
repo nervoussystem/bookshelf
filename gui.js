@@ -1,7 +1,12 @@
 var bookshelf = require('./bookshelf.js');
 var voronoi = require('./voronoi.js');
 var TWEEN = require('tween.js');
+var colorSet = require("./colorSet.js");
 
+var connectorColors = [
+{"name": "white", "r":255,"g":255,"b":255},
+{"name": "black", "r":0,"g":0,"b":0},
+];
 /*
 initializes the GUI and its listeners
 
@@ -77,6 +82,8 @@ function init() {
   setBookshelfHeightUI();
   setBookshelfDepthUI();
   
+  colorSet.init("colorSet",connectorColors);
+  
   animate();
 }
 
@@ -125,6 +132,10 @@ function setNumCellsUI() {
 	cellsOut.innerHTML = voronoi.mesh.faces.length;
 }
 
+function setColorCallback(func){
+	colorSet.setCallback(func);
+}
 //FUNCTIONS INCLUDED IN EXPORTED MODULE
 exports.init = init;
 exports.setNumCellsUI = setNumCellsUI;
+exports.setColorCallback = setColorCallback;

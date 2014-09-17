@@ -31,6 +31,7 @@ var nMatrix = mat3.create();
 var connectorVbo;
 var shelfVbo;
 
+var colorInfo;
 
 
 var minimumShelf = 85;//105;
@@ -49,6 +50,8 @@ function init() {
   ctx = canvas2d.getContext('2d');
   gl = glUtils.init(canvas);
   //setupGui();
+  
+  gui.setColorCallback(setConnectorColor);
   gui.init();
   colorShader = glShader.loadShader(gl,"../shaders/simpleColor.vert","../shaders/simpleColor.frag");
   phongShader = glShader.loadShader(gl,"../shaders/phongSimple.vert","../shaders/phongSimple.frag");
@@ -303,7 +306,7 @@ function draw3d() {
   mat4.ortho(pMatrix,-maxDim,maxDim,maxDim,-maxDim,-3000,3000);
   camera.feed(mvMatrix);
   //set color
-  phongShader.uniforms.matColor.set([.1,.1,.1,1]);
+  phongShader.uniforms.matColor.set([colorInfo.r/255,colorInfo.g/255,colorInfo.b/255,1]);
   phongShader.uniforms.ambientLightingColor.set([.3,.3,.3]);
   phongShader.uniforms.directionalDiffuseColor.set([.7,.7,.7]);//.7
   var lightingDir = [.3,.3,.8];//[.3,.3,.8];
@@ -716,4 +719,8 @@ function setDVUint16(dv, val) {
 function setDVUint32(dv, val) {
   dv.setUint32(dv.offset,val,true);
   dv.offset += 4;
+}
+
+function setConnectorColor(c) {
+	colorInfo = c;
 }

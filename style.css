@@ -10,7 +10,7 @@ a, a:visited {color:#000;text-decoration:none;font-weight:bold;}
 .subtitle {font-size:16px;}
 
 .nervousLogo img {width:60px;margin:5px;}
-.nervousLogo {position:absolute;right:10px;top:10px;width:110px;text-align:center;font-size:13px;}
+.nervousLogo {position:absolute;right:10px;bottom:10px;width:110px;text-align:center;font-size:13px;}
 
 
 
@@ -35,8 +35,22 @@ margin: 0;
 
 
 
-.purchase {width:300px;float:left;}
+.purchase {position:absolute;width:300px;right:20px;}
 .purchase .heading {font-size:20px;text-align:center;width:100%;border-bottom:1px solid #ccc;text-transform:uppercase;}
 .purchase .option {width:100px;float:left;}
 .purchase .optionTxt {font-size:.8em;text-align:center;}
 .purchase .optionTitle {text-align:center;}
+.purchase .optionPrice {text-align:center;color: rgb(0,136,255);}
+
+#colorSet {
+width: 168px;
+}
+
+.colorBox {
+width: 20px;
+height: 20px;
+float: left;
+margin: 2px;
+border-radius: 20px;
+cursor: pointer;
+}
