@@ -288,8 +288,8 @@ function draw3d() {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.enable(gl.DEPTH_TEST);
   if(!colorShader.isReady || !phongShader.isReady) return;
-  draw2dGL();
-  gl.viewport(800,0,800,800);
+  //draw2dGL();
+  gl.viewport(400,0,800,800);
   
   phongShader.begin();
   mat4.identity(mvMatrix);

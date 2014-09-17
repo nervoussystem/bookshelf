@@ -65,6 +65,14 @@ var voronoi = (function() {
   var p3 = vec2.create();
   return function voronoi() {
     var triangulation = new SweepContext(outsidePts);
+    
+    //limit pts
+    for(var i=0;i<pts.length;++i) {
+      var pt = pts[i];
+      pt.x = Math.max(0,Math.min(pt.x,width));
+      pt.y = Math.max(0,Math.min(pt.y,height));
+    }
+    
     triangulation.addPoints(pts);
     triangulation.triangulate();
     

@@ -31,6 +31,17 @@ vec3.angle = function(v1,v2) {
 	return Math.acos(vec3.dot(v1,v2)/(vec3.length(v1)*vec3.length(v2)));
 }
 
+NScamera.lookAt = (function() {
+  var dir = vec3.create();
+  return function lookAt(pos,center,up) {
+    vec3.sub(dir,center,pos);
+    vec3.copy(this.center,center);
+    var len = vec3.length(dir);
+    this.distance = len;
+    quat.rotationTo();
+  }
+})();
+
 NScamera.feed = (function() {
   var pos = vec3.create();
   var up = vec3.create();
