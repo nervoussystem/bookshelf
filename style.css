@@ -15,7 +15,20 @@ a, a:visited {color:#000;text-decoration:none;font-weight:bold;}
 
 
 .shelfDataTable {width:300px;}
-.shelfData {width:100%;float:left;}
+.shelfData {width:100%;float:left;padding: 2px 0 2px 0;}
 .shelfData .slider {float:left;}
-.shelfData .dataTitle {text-transform:uppercase;float:left;font-size:.8em;width:50px;}
-.shelfData .dataValue {float:left;font-size:.8em;color: rgb(0,136,255);padding-left:10px;text-align:right;width:50px;}
+.shelfData .dataTitle {text-transform:uppercase;float:left;font-size:.8em;width:50px;line-height:20px;}
+.shelfData .dataValue {float:left;font-size:.8em;color: rgb(0,136,255);padding-left:10px;text-align:right;width:50px;margin-right:5px;}
+
+
+
+input.editableVal {
+color: #000;
+background-color: #ddd;
+box-shadow: 2px 2px 2px #666;
+padding: 7px;
+height: 20px;
+border: none;
+font-family: 'Electrolize',sans-serif;
+margin: 0;
+}
