@@ -1,5 +1,6 @@
 var bookshelf = require('./bookshelf.js');
 var voronoi = require('./voronoi.js');
+var TWEEN = require('tween.js');
 
 /*
 initializes the GUI and its listeners
@@ -19,29 +20,46 @@ function init() {
   heightSlider.addEventListener("input", function() {bookshelf.setHeight(parseFloat(this.value));setBookshelfHeightUI();}, false);
   depthSlider.addEventListener("input", function() {bookshelf.setDepth(parseFloat(this.value));setBookshelfDepthUI();}, false);
   
+  //person enters text in width input box
   widthOut.addEventListener("change", function() {
 	var val = parseFloat(this.value)*25.4;
-	widthSlider.value = val;
-	bookshelf.setWidth(val);
-	setBookshelfWidthUI();}, false);
+	var tweenWidth = new TWEEN.Tween( {x:bookshelf.width} )
+		.to( {x:val},2000 )
+		.easing( TWEEN.Easing.Cubic.InOut  )
+		.onUpdate( function() {
+			bookshelf.setWidth(this.x);
+		})
+		.start();
+	//widthSlider.value = val;
+	//bookshelf.setWidth(widthSlider.value);
+	//setBookshelfWidthUI();
+	}, false);
 
   heightOut.addEventListener("change", function() {
 	var val = parseFloat(this.value)*25.4;
 	heightSlider.value = val;
-	bookshelf.setHeight(val);
+	bookshelf.setHeight(heightSlider.value); //using slider to limit range
 	setBookshelfHeightUI();}, false);
 	
  depthOut.addEventListener("change", function() {
 	var val = parseFloat(this.value)*25.4;
 	depthSlider.value = val;
-	bookshelf.setDepth(val);
+	bookshelf.setDepth(depthSlider.value);
 	setBookshelfDepthUI();}, false);
   
   setBookshelfWidthUI();
   setBookshelfHeightUI();
   setBookshelfDepthUI();
+  
+  animate();
 }
 
+function animate(time) {
+	requestAnimationFrame(animate);
+	TWEEN.update(time);
+}
+
+	
 /*
 sets UI elements related to the bookshelf's width
 
