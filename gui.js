@@ -23,29 +23,55 @@ function init() {
   //person enters text in width input box
   widthOut.addEventListener("change", function() {
 	var val = parseFloat(this.value)*25.4;
-	var tweenWidth = new TWEEN.Tween( {x:bookshelf.width} )
+	val = Math.min(val,widthSlider.max);
+	val = Math.max(val,widthSlider.min);
+	setBookshelfWidthUI(val);
+	var tween = new TWEEN.Tween( {x:bookshelf.width} )
 		.to( {x:val},2000 )
 		.easing( TWEEN.Easing.Cubic.InOut  )
 		.onUpdate( function() {
 			bookshelf.setWidth(this.x);
+			widthSlider.value = this.x;
 		})
 		.start();
-	//widthSlider.value = val;
-	//bookshelf.setWidth(widthSlider.value);
-	//setBookshelfWidthUI();
 	}, false);
 
+	  //person enters text in height input box
   heightOut.addEventListener("change", function() {
 	var val = parseFloat(this.value)*25.4;
-	heightSlider.value = val;
-	bookshelf.setHeight(heightSlider.value); //using slider to limit range
-	setBookshelfHeightUI();}, false);
+	val = Math.min(val,heightSlider.max);
+	val = Math.max(val,heightSlider.min);
+	setBookshelfHeightUI(val);
+	var tween = new TWEEN.Tween( {x:bookshelf.height} )
+		.to( {x:val},2000 )
+		.easing( TWEEN.Easing.Cubic.InOut  )
+		.onUpdate( function() {
+			bookshelf.setHeight(this.x);
+			heightSlider.value = this.x;
+		})
+		.start();
+	}, false);
+
 	
- depthOut.addEventListener("change", function() {
+	  //person enters text in width input box
+  depthOut.addEventListener("change", function() {
 	var val = parseFloat(this.value)*25.4;
-	depthSlider.value = val;
-	bookshelf.setDepth(depthSlider.value);
-	setBookshelfDepthUI();}, false);
+	val = Math.min(val,depthSlider.max);
+	val = Math.max(val,depthSlider.min);
+	setBookshelfDepthUI(val);
+	var tween = new TWEEN.Tween( {x:bookshelf.depth} )
+		.to( {x:val},2000 )
+		.easing( TWEEN.Easing.Cubic.InOut  )
+		.onUpdate( function() {
+			bookshelf.setDepth(this.x);
+			depthSlider.value = this.x;
+		})
+		.start();
+	}, false);
+
+
+	
+
   
   setBookshelfWidthUI();
   setBookshelfHeightUI();
@@ -65,10 +91,13 @@ sets UI elements related to the bookshelf's width
 
 callback for width slider
 */
-function setBookshelfWidthUI() {
+function setBookshelfWidthUI(val) {
 	var wDiv = document.getElementById("widthOut");
-	var inches = bookshelf.width/25.4;
-	wDiv.value = parseFloat(inches).toFixed(1);	
+	
+	if(val==undefined) val = bookshelf.width/25.4;
+	else val = val/25.4;
+	wDiv.value = parseFloat(val).toFixed(1);	
+	
 }
 /*
 sets UI elements related to the bookshelf's height
