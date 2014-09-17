@@ -38,7 +38,6 @@ NScamera.lookAt = (function() {
     vec3.copy(this.center,center);
     var len = vec3.length(dir);
     this.distance = len;
-    quat.rotationTo();
   }
 })();
 

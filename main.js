@@ -13,8 +13,10 @@ var bookshelf = require('./bookshelf.js');
 var gui = require('./gui.js');
 var vec2 = glMatrix.vec2;
 var vec3 = glMatrix.vec3;
+var vec4 = glMatrix.vec4;
 var mat4 = glMatrix.mat4;
 var mat3 = glMatrix.mat3;
+var quat = glMatrix.quat;
 
 var canvas;
 var canvas2d;
@@ -61,6 +63,9 @@ function init() {
   vboMesh.enableNormals(shelfVbo);
   requestAnimationFrame(step);
   
+  quat.rotateY(camera.rot,camera.rot,15*Math.PI/180.0);
+  quat.rotateX(camera.rot,camera.rot,15*Math.PI/180.0);
+  vec3.set(camera.center,bookshelf.width*0.5,bookshelf.height*0.5,5);
   //gui.init();
 }
 
@@ -69,6 +74,7 @@ init();
 
 function step() {
   requestAnimationFrame(step);
+  vec3.set(camera.center,bookshelf.width*0.5,bookshelf.height*0.5,bookshelf.depth*0.5);
   camera.step();
   checkHover();
   dragHover();
@@ -142,7 +148,7 @@ function drawTriangles2d() {
     ctx.lineTo(tri.points_[2].x,tri.points_[2].y);
     ctx.lineTo(tri.points_[0].x,tri.points_[0].y);
 
-  ctx.stroke();
+    ctx.stroke();
   }
 }
 
@@ -293,7 +299,8 @@ function draw3d() {
   
   phongShader.begin();
   mat4.identity(mvMatrix);
-  mat4.ortho(pMatrix,-500,2000,2000,-500,-2000,2000);
+  var maxDim = Math.max(bookshelf.width,bookshelf.height)*0.5+100;
+  mat4.ortho(pMatrix,-maxDim,maxDim,maxDim,-maxDim,-3000,3000);
   camera.feed(mvMatrix);
   //set color
   phongShader.uniforms.matColor.set([.1,.1,.1,1]);
@@ -516,11 +523,43 @@ function download() {
   
   downloadVboAsSTL(connectorVbo);
 }
-function screenToReal(x,y,out) {
-  var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
-  out[0] = x/scaling;
-  out[1] = y/scaling;
-}
+/*
+  convert point on screen to point on model
+  
+  @param float x
+    mouse position in x
+  @param float y
+    mouse position in y
+  @out array out
+    output point in real space
+*/
+var screenToReal = (function() {
+  var pt1 = vec3.create();
+  var dir = vec3.create();
+  var planeDir = vec3.create();
+  var ray = vec4.create();
+  var invMatrix = mat4.create();
+  var camPos = vec4.create();
+  var up = vec3.clone([0,0,1]);
+  return function screenToReal(x,y,out) {
+    vec4.set(ray, 2.0*(x-400.0)/800.0-1.0, 1.0-2.0*y/800.0,0.0,1.0);
+    mat4.invert(invMatrix, pMatrix);
+    vec4.transformMat4(ray, ray, invMatrix);
+
+    ray[2] = -1.0;
+    ray[3] = 0.0;
+    mat4.invert(invMatrix,mvMatrix);
+    vec4.transformMat4(ray, ray, invMatrix);
+    vec3.normalize(ray,ray);
+    
+    vec4.set(camPos,0,0,0,1.0);
+    vec4.transformMat4(camPos,camPos,invMatrix);
+    var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
+    out[0] = x/scaling;
+    out[1] = y/scaling;
+  
+  }
+})();
 
 function realToScreen(x,y,out) {
   var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
@@ -564,9 +603,9 @@ var checkHover = (function() {
 pointer.mouseDragged = (function() {
   var coord = vec2.create();
   return function mouseDragged() {
-    if(pointer.mouseX > window2dWidth) {
-      camera.mouseDragged(pointer.mouseX-pointer.pmouseX,pointer.mouseY-pointer.pmouseY,pointer.mouseX,pointer.mouseY,pointer.mouseButton);
-    }
+    //if(pointer.mouseX > window2dWidth) {
+      //camera.mouseDragged(pointer.mouseX-pointer.pmouseX,pointer.mouseY-pointer.pmouseY,pointer.mouseX,pointer.mouseY,pointer.mouseButton);
+    //}
   }
 })();
 
