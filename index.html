@@ -11,27 +11,31 @@
 <div style="">
 <canvas id="2d" width="0" height="0" style="float:left;"></canvas>
 <canvas id="gl" width="1600" height="800" style="float:left;"></canvas>
-<div>
+<div id="bottomUI">
 <div class="shelfDataTable">
-	<div class="shelfData">This bookshelf has <span id="cellsOut"></span> cells</div>
 	<div class="shelfData">
-		<div class="dataTitle">width</div>
+		<div class="dataTitle titleMedium">width</div>
 		<input class="dataValue editableVal" id="widthOut"/>
-		<input id="widthSlider"  class="slider" type="range" min="375" max="3750" value="1200" />
+		<input id="widthSlider"  class="slider" type="range"/>
 	</div>
 	<div class="shelfData">
-		<div class="dataTitle">height</div>
+		<div class="dataTitle titleMedium">height</div>
 		<input class="dataValue editableVal" id="heightOut"/>
-		<input id="heightSlider"  class="slider" type="range" min="375" max="3750" value="1800" />
+		<input id="heightSlider"  class="slider" type="range" />
 	</div>
 	<div class="shelfData">
-		<div class="dataTitle">depth</div>
+		<div class="dataTitle titleMedium">depth</div>
 		<input class="dataValue editableVal" id="depthOut"/>
-		<input id="depthSlider" class="slider" type="range" min="70" max="600" value="254" />
+		<input id="depthSlider" class="slider" type="range"  />
 	</div>
 </div>
-<div id="colorSet"></div>
+<div class="materialOptions">
+	<div class="dataTitle titleMedium">connector color</div>
+	<div id="colorSet"></div>
+</div>
+</div>
 <div class="purchase">
+	<div class="shelfData">This bookshelf measures <span id="dimOut"></span> and has <span id="cellsOut"></span> cells</div>
 	<div class="heading">purchase</div>
 	<div class="option">
 		<div class="optionPrice">$5</div>

@@ -13,13 +13,14 @@ a, a:visited {color:#000;text-decoration:none;font-weight:bold;}
 .nervousLogo {position:absolute;right:10px;bottom:10px;width:110px;text-align:center;font-size:13px;}
 
 
-
+#bottomUI {position:absolute;bottom:10px;}
 .shelfDataTable {width:300px;float:left;}
 .shelfData {width:100%;float:left;padding: 2px 0 2px 0;}
 .shelfData .slider {float:left;}
-.shelfData .dataTitle {text-transform:uppercase;float:left;font-size:.8em;width:50px;line-height:20px;}
+.shelfData .dataTitle  {float:left;width:50px;}
 .shelfData .dataValue {float:left;font-size:.8em;color: rgb(0,136,255);padding-left:10px;text-align:right;width:50px;margin-right:5px;}
 
+.titleMedium {text-transform:uppercase;font-size:.8em;line-height:20px;}
 
 
 input.editableVal {
@@ -42,6 +43,8 @@ margin: 0;
 .purchase .optionTitle {text-align:center;}
 .purchase .optionPrice {text-align:center;color: rgb(0,136,255);}
 
+.materialOptions {float:left;width:200px;}
+.materialOptions .dataTitle {float:left;width:100%;}
 #colorSet {
 width: 168px;
 }

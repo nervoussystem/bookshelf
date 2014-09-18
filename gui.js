@@ -4,8 +4,12 @@ var TWEEN = require('tween.js');
 var colorSet = require("./colorSet.js");
 
 var connectorColors = [
-{"name": "white", "r":255,"g":255,"b":255},
-{"name": "black", "r":0,"g":0,"b":0},
+{"name": "white", "r":255, "g":255, "b":255},
+{"name": "black", "r":0, "g":0, "b":0},
+{"name": "ultramarine blue", "r": 6, "g": 33, "b": 186},
+{"name": "leaf green", "r": 77, "g": 182, "b": 89},
+{"name": "signal yellow", "r": 255, "g": 238, "b": 57},
+{"name": "traffic red", "r":255, "g":71, "b":40}
 ];
 /*
 initializes the GUI and its listeners
@@ -20,6 +24,19 @@ function init() {
   var widthOut = document.getElementById("widthOut");
   var heightOut = document.getElementById("heightOut");
   var depthOut = document.getElementById("depthOut");
+  
+  widthSlider.min = 375;
+  widthSlider.max = 3750;
+  widthSlider.value = bookshelf.width;
+  
+  heightSlider.min = 375;
+  heightSlider.max = 3750;
+  heightSlider.value = bookshelf.height;
+
+  depthSlider.min = 70;
+  depthSlider.max = 600;
+  depthSlider.value = bookshelf.depth;
+
   
   widthSlider.addEventListener("input", function() {bookshelf.setWidth(parseFloat(this.value));setBookshelfWidthUI();}, false);
   heightSlider.addEventListener("input", function() {bookshelf.setHeight(parseFloat(this.value));setBookshelfHeightUI();}, false);

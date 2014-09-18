@@ -3,8 +3,8 @@ var voronoi = require('./voronoi.js');
 
 var bookshelf = exports;
 
-bookshelf.width = 1200; //bookshelf width in mm
-bookshelf.height = 1800; //bookshelf height in mm
+bookshelf.width = 4*12*25.4; //bookshelf width in mm
+bookshelf.height = 3*12*25.4; //bookshelf height in mm
 bookshelf.depth = 254; //bookshelf depth in mm
 
 bookshelf.woodWidth = 12.2; //thickness of the wood sheets in mm

@@ -26,7 +26,7 @@ function reset() {
   //make regularly spaced points
   pts.length = 0;
   
-  var defaultSpacing = 310;
+  var defaultSpacing = 250;
   var xDivs = Math.floor(width/(defaultSpacing+1));
   var yDivs = Math.floor(height/(defaultSpacing+1));
   

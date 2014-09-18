@@ -4,64 +4,59 @@ var colors;
 var action;
 
 var materialName;
+var materialId;
 
 function init(colorDiv,colorArray) {
 	div = document.getElementById(colorDiv);
 	colors = colorArray;
 	
-	var littleBoxes="";
+	
 	for(i=0;i<colors.length;i++)    {
-		littleBoxes += "<div onclick=setColor('" + colors[i].name + "') ";
-		littleBoxes += "id='"+ colors[i].name+"'";
-		littleBoxes += "class='colorBox' style='background-color:rgb(";
-		littleBoxes += colors[i].r + "," + colors[i].g + "," + colors[i].b +");";
+		var swatch = document.createElement('div');
+		div.appendChild(swatch);
+		swatch.id = colors[i].name;
+		swatch.className = 'colorBox';
+		swatch.addEventListener("click", function(){setColor(this.id);}, false);
+		swatch.style.backgroundColor = "rgb(" + colors[i].r + "," + colors[i].g + "," + colors[i].b + ")";
+		if(colors[i].name == "white") swatch.style.border = "2px solid #ccc";
+		else swatch.style.border = "2px solid rgb(" + colors[i].r + "," + colors[i].g + "," + colors[i].b + ")";
 		/*if(colors[i]=="ffffff") {littleBoxes += ";border: 1px solid #ccc;";}
 		else if(colors[i]==materialColor) {littleBoxes += ";border: 2px solid #000;";}
 		else littleBoxes += ";border: 2px solid #"+ colors[i] + ";";*/
-		littleBoxes +="'></div>";
+		
 	}
-	div.innerHTML = littleBoxes;
-
-	materialName = colors[0].name;
+	
+	materialId = 1;
+	materialName = colors[materialId].name;
+	
 	setColor(materialName);
 	
 }
 
 function setColor(colorName){
+	var colorId;
+	//get new id
+	for(i = 0;i<colors.length;i++) {
+		if(colors[i].name == colorName) colorId = i;
+	}
+	
 	//deselect previous color
 	var lastColor = document.getElementById(materialName);
-	//lastColor.style.border = "2px solid #"+ materialColor;
+	if(materialName=="white") lastColor.style.border = "2px solid #ccc";
+	else lastColor.style.border = "2px solid rgb(" + colors[materialId].r + "," + colors[materialId].g + "," + colors[materialId].b + ")";
 	
 	//select chosen color
 	var myColor = document.getElementById(colorName);
 	myColor.style.border = "2px solid #000";
 	materialName = colorName;
+	materialId = colorId;
 	
-	
-	var colorId;
-	//get id
-	for(i = 0;i<colors.length;i++) {
-		if(colors[i].name == colorName) colorId = i;
-	}
-	
-	action(colors[colorId]);
-	//materialColor = colors[colorId];
-	//materialColorRGB= hexToRgb(materialColor);
-	
-	//var colorNameBox = document.getElementById("colorName");
-	//colorNameBox.innerHTML = materialName;
-	
+	action(colors[colorId]);	
 }
 
 function setCallback(func) {
 	action =func;
 }
-/*
-var colorSet = require("colorSet.js");
-colorSet.setDiv("colorDiv")
-	.setColors(colorList)
-	.setCallback(colorfunction)
-	.init();*/
 	
 exports.setCallback = setCallback;
 exports.init = init;
