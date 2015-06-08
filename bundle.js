@@ -4,13 +4,12 @@ var voronoi = require('./voronoi.js');
 
 var bookshelf = exports;
 
-bookshelf.width = 4*12*25.4; //bookshelf width in mm
-bookshelf.height = 3*12*25.4; //bookshelf height in mm
+bookshelf.width = 2*12*25.4; //bookshelf width in mm
+bookshelf.height = 2*12*25.4; //bookshelf height in mm
 bookshelf.depth = 254; //bookshelf depth in mm
 
-bookshelf.woodWidth = 12.2; //thickness of the wood sheets in mm
-
-
+bookshelf.woodWidth = 5.25;//6.35;//12.2; //thickness of the wood sheets in mm
+bookshelf.flattenAngle = Math.PI*0.1;
 
 /*
 sets the bookshelf width
@@ -23,8 +22,6 @@ callback for width slider
 function setWidth(val) {
 	bookshelf.width = val;
 	voronoi.setDimensions(bookshelf.width,bookshelf.height);
-
- 
 }
 /*
 sets the bookshelf height
@@ -277,18 +274,18 @@ var text = require("./text.js");
 var poly2tri = require("./poly2tri.js");
 var SweepContext = poly2tri.SweepContext;
 
-var woodWidth = 12.2;
-var conLen = 35; //45
-var conOffset = 12;
-var conWidth = 12;//20
-var shelfOffset = 12;
+var woodWidth = 5.25;//6.35;//12.2;
+var conLen = 25; //45
+var conOffset = 8;//12;
+var conWidth = 8;//12;//20
+var shelfOffset = 7;//10;//13;
 var printTolerance = 0;
-var labelHeight = 5;
-var filletRadius = 9;
+var labelHeight = 3.1;
+var filletRadius = 7;//9;
 
-var toothWidth = 2.5;
-var toothDepth = 2.5;
-var toothOffset = 12.25;
+var toothWidth = 2.4;//2.5;
+var toothDepth = 1.4;//2.5;
+var toothOffset = 11;//12.25;
 
 var connectorTris = [];
 function initConnector(gl) {
@@ -838,6 +835,7 @@ function init() {
   var widthSlider = document.getElementById("widthSlider");
   var heightSlider = document.getElementById("heightSlider");
   var depthSlider = document.getElementById("depthSlider");
+  var angleSlider = document.getElementById("angleSlider");
   var widthOut = document.getElementById("widthOut");
   var heightOut = document.getElementById("heightOut");
   var depthOut = document.getElementById("depthOut");
@@ -854,10 +852,15 @@ function init() {
   depthSlider.max = 600;
   depthSlider.value = bookshelf.depth;
 
+  angleSlider.min = 0;
+  angleSlider.max = 30;
+  angleSlider.value = bookshelf.flattenAngle*180/Math.PI;
   
   widthSlider.addEventListener("input", function() {bookshelf.setWidth(parseFloat(this.value));setBookshelfWidthUI();}, false);
   heightSlider.addEventListener("input", function() {bookshelf.setHeight(parseFloat(this.value));setBookshelfHeightUI();}, false);
   depthSlider.addEventListener("input", function() {bookshelf.setDepth(parseFloat(this.value));setBookshelfDepthUI();}, false);
+
+  angleSlider.addEventListener("input", function() {bookshelf.flattenAngle = parseFloat(this.value)*Math.PI/180.0;}, false);
   
   //person enters text in width input box
   widthOut.addEventListener("change", function() {
@@ -885,7 +888,7 @@ function init() {
 		.to( {x:val},2000 )
 		.easing( TWEEN.Easing.Cubic.InOut  )
 		.onUpdate( function() {
-			bookshelf.setHeight(this.x);
+			bookshelf.setHeight(parseFloat(this.x));
 			heightSlider.value = this.x;
 		})
 		.start();
@@ -1007,18 +1010,28 @@ var pMatrix = mat4.create();
 var nMatrix = mat3.create();
 var connectorVbo;
 var shelfVbo;
+var circleVbo;
+var tempVbo;
 
 var colorInfo;
 
+var minimumShelf = 75;//85;//105;
+var flattenAngle = Math.PI*.1;
+bookshelf.flattenAngle = flattenAngle;
+var sinFlattenAngle = Math.sin(flattenAngle);
 
-var minimumShelf = 85;//105;
 var selectedPt = -1;
 
 var window2dWidth = 800;
 
+init();
+
 function init() {
 //stupid
 	document.addEventListener( "keydown",keyPress,false);
+	document.addEventListener( 'drop', onDocumentDrop, false );
+	document.addEventListener( 'dragover', function(event){event.preventDefault();}, false );
+	document.addEventListener( 'dragleave', function(event){event.preventDefault();}, false );
 
   canvas = document.getElementById("gl");
   canvas2d = document.getElementById("2d");
@@ -1038,19 +1051,28 @@ function init() {
   
   voronoiEdges = vboMesh.create();
   connectorVbo = vboMesh.create32();
+  tempVbo = vboMesh.create();
   shelfVbo = vboMesh.create();
   vboMesh.enableTexCoord(shelfVbo);
   vboMesh.enableNormals(shelfVbo);
+  initCircle();
   requestAnimationFrame(step);
   
-  quat.rotateY(camera.rot,camera.rot,15*Math.PI/180.0);
+  quat.rotateY(camera.rot,camera.rot,195*Math.PI/180.0);
   quat.rotateX(camera.rot,camera.rot,15*Math.PI/180.0);
   vec3.set(camera.center,bookshelf.width*0.5,bookshelf.height*0.5,5);
   //gui.init();
 }
 
-init();
-
+function initCircle() {
+  circleVbo = vboMesh.create();
+  vboMesh.addVertex(circleVbo,[0,0,0]);
+  for(var i=0;i<12;++i) {
+    var angle = i*Math.PI*2.0/12.0;
+    vboMesh.addVertex(circleVbo, [6*Math.cos(angle),6*Math.sin(angle),0]);
+  }
+  vboMesh.buffer(circleVbo,gl);
+}
 
 function step() {
   requestAnimationFrame(step);
@@ -1065,10 +1087,131 @@ function step() {
   fixShelves();
   fixShelves();
   fixShelves();
+  flattenShelves();
   getConnectors();
   drawShelves();
   draw();
   gui.setNumCellsUI();
+}
+
+function onDocumentDrop(event) {
+  event.preventDefault();
+  var file = event.dataTransfer.files[ 0 ];
+  var filename = file.name;
+  if(filename.substr(filename.length-4,4) == ".obj") {
+    var reader = new FileReader();
+    
+    reader.onload = function ( event ) {
+      loadObj(event.target.result.split("\n"),voronoi.mesh);
+      vboMesh.clear(connectorVbo);
+      getConnectors();
+      download();
+    };
+        
+    reader.readAsText( file );
+  }
+}
+
+function loadObj(lines,mesh) {
+  mesh.edges.length = 0;
+  mesh.faces.length = 0;
+  mesh.vertices.length = 0;
+  var pt = vec3.create();
+  var ptToEdge = [];
+  
+  var j;
+  var tri = [];
+  for(var i=0,len=lines.length;i<len;++i) {
+    var tokens = lines[i].split(" ");
+    if(tokens[0] == "v") {
+       var v = mesh.addVertex([parseFloat(tokens[1]), parseFloat(tokens[2]), parseFloat(tokens[3])]);
+    } else if(tokens[0] == "f") {
+      var newFace = mesh.addFace();
+      tri.length = 0;
+      for(j=1;j<tokens.length;++j) {
+        tri.push(parseInt(tokens[j].split("/")[0])-1);
+      }
+      
+      var i1 = tri[tri.length-1];
+      var prevEdge = null;
+      for(j=0;j<tri.length;++j) {
+        var i2 = tri[j];
+        var newEdge1 = mesh.addEdge();
+        newEdge1.v = mesh.vertices[i2];
+        mesh.vertices[i2].e = newEdge1;
+        newEdge1.face = newFace;
+        
+        findPair(newEdge1, ptToEdge,i1,i2);
+        if(prevEdge != null) {
+          prevEdge.next = newEdge1;
+          newEdge1.prev = prevEdge;
+        }
+        if(j==0) {
+          newFace.e = newEdge1;
+        }
+        i1 = i2;
+        prevEdge = newEdge1;
+        
+      }
+      prevEdge.next = newFace.e;
+      newFace.e.prev = prevEdge;
+      newFace.on = true;
+    }
+  }
+  
+  makeBoundaryEdges(mesh,ptToEdge);
+}
+
+function findPair(e,ptToEdge,i1,i2) {
+  var ptEdge = ptToEdge[i2];
+  if(ptEdge) {
+    for(var i=0;i<ptEdge.length;++i) {
+      var e2 = ptEdge[i];
+      if(e2.v.index == i1) {
+        e2.pair = e;
+        e.pair = e2;
+        return;
+      }
+    }
+  }
+  ptEdge = ptToEdge[i1];
+  if(ptEdge) {
+    ptEdge.push(e);
+  } else {
+    ptEdge = [e];
+    ptToEdge[i1] = ptEdge;
+  }
+}
+
+function makeBoundaryEdges(mesh,ptToEdge) {
+  //add boundary edges and unsure every edge has a pair
+  var numEdges = mesh.edges.length;
+  for(var i=0;i<numEdges;++i) {
+    var e = mesh.edges[i];
+    if(e.pair == null) {
+      var newEdge = mesh.addEdge();
+      newEdge.pair = e;
+      e.pair = newEdge;
+      //hack only works for triangles (should load edges in pairs instead)
+      //if prev pointer is add could use e.prev.v;
+      newEdge.v = e.prev.v;
+      newEdge.v.b = true;
+      var ptEdge = ptToEdge[e.v.index];
+      ptEdge.push(newEdge);
+    }
+  }
+  for(var i=numEdges;i<mesh.edges.length;++i) {
+    var e = mesh.edges[i];
+    var ptEdge = ptToEdge[e.v.index];
+    if(ptEdge) {
+      for(var j=0;j<ptEdge.length;++j) {
+        var e2 = ptEdge[j];
+        if(e2.face == null) {
+          e.next = e2;
+        }
+      }
+    }
+  }
 }
 
 function draw() {
@@ -1283,18 +1426,56 @@ function draw3d() {
   mat4.ortho(pMatrix,-maxDim,maxDim,maxDim,-maxDim,-3000,3000);
   camera.feed(mvMatrix);
   //set color
-  phongShader.uniforms.matColor.set([colorInfo.r/255,colorInfo.g/255,colorInfo.b/255,1]);
   phongShader.uniforms.ambientLightingColor.set([.3,.3,.3]);
   phongShader.uniforms.directionalDiffuseColor.set([.7,.7,.7]);//.7
   var lightingDir = [.3,.3,.8];//[.3,.3,.8];
   vec3.normalize(lightingDir,lightingDir);
   phongShader.uniforms.lightingDirection.set(lightingDir);
   phongShader.uniforms.materialShininess.set(8);
+  
   //set matrices
   mat3.normalFromMat4(nMatrix,mvMatrix);
   phongShader.uniforms.mvMatrix.set(mvMatrix);
   phongShader.uniforms.nMatrix.set(nMatrix);
   phongShader.uniforms.pMatrix.set(pMatrix);
+    
+  phongShader.uniforms.matColor.set([0,0,0,1]);
+  phongShader.attribs.vertexPosition.set(circleVbo.vertexBuffer);
+  phongShader.attribs.vertexNormal.disable();
+  phongShader.attribs.vertexPosition.set(circleVbo.vertexBuffer);
+  for(var i=0;i<voronoi.pts.length;++i) {
+    var pt = voronoi.pts[i];
+    if(selectedPt == i) {
+      phongShader.uniforms.matColor.set([1,0,0,.5]);
+    } else if(pt.boundary) {
+      phongShader.uniforms.matColor.set([0,0,1,.5]);
+    } else {
+      phongShader.uniforms.matColor.set([0,0,0,.5]);
+    }
+    mat4.translate(mvMatrix,mvMatrix,[pt.x,pt.y,0]);
+    phongShader.uniforms.mvMatrix.set(mvMatrix);
+    gl.drawArrays(gl.TRIANGLE_FAN,0,circleVbo.numVertices);
+    mat4.translate(mvMatrix,mvMatrix,[-pt.x,-pt.y,0]);
+
+  }
+  phongShader.attribs.vertexNormal.enable();
+  phongShader.uniforms.mvMatrix.set(mvMatrix);
+  
+  //draw shelves
+  //wood color
+  phongShader.uniforms.matColor.set([229.0/255,204.0/255,164.0/255,1]);
+  //wood is not shiny
+  phongShader.uniforms.materialShininess.set(1);
+  phongShader.attribs.vertexNormal.set(shelfVbo.normalBuffer);
+  phongShader.attribs.vertexPosition.set(shelfVbo.vertexBuffer);
+  gl.drawArrays(gl.TRIANGLES,0,shelfVbo.numVertices);
+
+  phongShader.uniforms.matColor.set([colorInfo.r/255,colorInfo.g/255,colorInfo.b/255,1]);
+
+  mat4.scale(mvMatrix,mvMatrix,[1,1,-1]);
+  mat3.normalFromMat4(nMatrix,mvMatrix);
+  phongShader.uniforms.mvMatrix.set(mvMatrix);
+  phongShader.uniforms.nMatrix.set(nMatrix);
   
   //make voronoi edges vbo
   //voronoiToEdgeVBO();
@@ -1308,23 +1489,13 @@ function draw3d() {
   phongShader.attribs.vertexNormal.set(connectorVbo.normalBuffer);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,connectorVbo.indexBuffer);
   gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
-
+  
   mat4.scale(mvMatrix,mvMatrix,[1,1,-1]);
-  mat4.translate(mvMatrix,mvMatrix,[0,0,-bookshelf.depth]);
+  mat4.translate(mvMatrix,mvMatrix,[0,0,bookshelf.depth]);
   mat3.normalFromMat4(nMatrix,mvMatrix);
   phongShader.uniforms.mvMatrix.set(mvMatrix);
   phongShader.uniforms.nMatrix.set(nMatrix);  
-  gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);
-  
-  //draw shelves
-  //wood color
-  phongShader.uniforms.matColor.set([229.0/255,204.0/255,164.0/255,1]);
-  //wood is not shiny
-  phongShader.uniforms.materialShininess.set(1);
-  phongShader.attribs.vertexNormal.set(shelfVbo.normalBuffer);
-  phongShader.attribs.vertexPosition.set(shelfVbo.vertexBuffer);
-  gl.drawArrays(gl.TRIANGLES,0,shelfVbo.numVertices);
-  
+  gl.drawElements(gl.TRIANGLES,connectorVbo.numIndices,gl.UNSIGNED_INT,0);  
   
   phongShader.end();  
 }
@@ -1450,6 +1621,39 @@ function fixShelves() {
   }
 }
 
+function flattenShelves() {
+  var iterations = 2;
+  var dir = vec2.create();
+  var mid = vec2.create();
+  sinFlattenAngle = Math.sin(bookshelf.flattenAngle);
+  for(var i=0;i<iterations;++i) {
+    for(var j=0;j<voronoi.mesh.edges.length;++j) {
+      var e = voronoi.mesh.edges[j];
+      if(e.v.e != null) {
+        var v1 = e.v;
+        var v2 = e.pair.v;
+        vec2.sub(dir,v2.pos,v1.pos);
+        var len = vec2.len(dir);
+        vec2.scale(dir,dir,1.0/len);
+        
+        if(Math.abs(dir[1]) < sinFlattenAngle) {
+          vec2.add(mid,v1.pos,v2.pos);
+          vec2.scale(mid,mid,0.5);
+          //v1.pos[1] = newY;
+          //v2.pos[1] = newY;
+          if(dir[0] > 0) {
+            vec2.set(v1.pos, -len*0.5+mid[0], mid[1]);
+            vec2.set(v2.pos, len*0.5+mid[0], mid[1]);
+          } else {
+            vec2.set(v1.pos, len*0.5+mid[0], mid[1]);
+            vec2.set(v2.pos, -len*0.5+mid[0], mid[1]);          
+          }
+        }        
+      }
+    }
+  }
+}
+
 function initVoronoi() {
   voronoi.setDimensions(bookshelf.width,bookshelf.height);
   voronoi.init();
@@ -1489,11 +1693,15 @@ function download() {
       lens[e.info.label] = len;
     }
   }
+  var totalLen = 0;
   for(var i=0;i<lens.length;++i) {
     if(lens[i]) {
       lenStr += i + " " + (lens[i]/25.4).toFixed(3) + "\n";
+      totalLen += (lens[i]/25.4);
     }
   }
+  
+  console.log(totalLen);
   
   var a = document.createElement('a');
   var blob = new Blob([lenStr]);
@@ -1502,7 +1710,34 @@ function download() {
   a.click();
   
   downloadVboAsSTL(connectorVbo);
+  downloadDesignMesh();
 }
+
+function downloadDesignMesh() {
+  var objStr = "";
+  for(var i=0;i<voronoi.mesh.vertices.length;++i) {
+    var v = voronoi.mesh.vertices[i];
+    objStr += "v " + v.pos[0] + " " + v.pos[1] + " " + v.pos[2] + "\n";
+  }
+  
+  for(var i=0;i<voronoi.mesh.faces.length;++i) {
+    var f = voronoi.mesh.faces[i];
+    objStr += "f";
+    var startE = f.e;
+    var e = startE;
+    do {
+      objStr += " " + (e.v.index+1);
+      e = e.next;
+    } while(e != startE);
+    objStr += "\n";
+  }
+  var a = document.createElement('a');
+  var blob = new Blob([objStr]);
+  a.href = window.URL.createObjectURL(blob);
+  a.download = "bookshelfMesh"+new Date().toISOString().substring(0,16)+".txt";
+  a.click();
+}
+
 /*
   convert point on screen to point on model
   
@@ -1519,6 +1754,7 @@ var screenToReal = (function() {
   var planeDir = vec3.create();
   var ray = vec4.create();
   var invMatrix = mat4.create();
+  var tMat = mat4.create();
   var ray2 = vec4.create();
   var up = vec3.clone([0,0,1]);
   return function screenToReal(x,y,out) {
@@ -1528,8 +1764,8 @@ var screenToReal = (function() {
 
     vec4.set(ray, 2.0*(x-400.0)/800.0-1.0, 1.0-2.0*y/800.0,-0.3,1.0);
     vec4.set(ray2, 2.0*(x-400.0)/800.0-1.0, 1.0-2.0*y/800.0,0.3,1.0);
-    mat4.mul(pMatrix,pMatrix,mvMatrix);
-    mat4.invert(invMatrix, pMatrix);
+    mat4.mul(tMat,pMatrix,mvMatrix);
+    mat4.invert(invMatrix, tMat);
     vec4.transformMat4(ray, ray, invMatrix);
     vec4.transformMat4(ray2, ray2, invMatrix);
 
@@ -1544,7 +1780,7 @@ var screenToReal = (function() {
     //vec4.transformMat4(ray2, ray2, invMatrix);
     vec3.sub(dir,ray,ray2);
     vec3.normalize(dir,dir);
-    vec2.scaleAndAdd(out,ray2,dir,(-ray2[2]+bookshelf.depth*0.5)/dir[2]);
+    vec2.scaleAndAdd(out,ray2,dir,(-ray2[2])/dir[2]);
     
     //var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
     //out[0] = x/scaling;
@@ -1555,16 +1791,17 @@ var screenToReal = (function() {
 
 var realToScreen = (function() {
   var pt = vec3.create();
+  var tMat = mat4.create();
   return function realToScreen(x,y,out) {
     //get camera transform
     mat4.identity(mvMatrix);
     camera.feed(mvMatrix);
 
-    mat4.mul(pMatrix,pMatrix,mvMatrix);
+    mat4.mul(tMat,pMatrix,mvMatrix);
 
-    vec3.set(pt,x,y,bookshelf.depth*0.5);
-    vec3.transformMat4(pt,pt,pMatrix);
-    y = 1.0-2.0*y/800.0
+    vec3.set(pt,x,y,0);
+    vec3.transformMat4(pt,pt,tMat);
+    //y = 1.0-2.0*y/800.0
     out[0] = (pt[0]+1.0)*400+400;
     out[1] = (pt[1]-1.0)*-400;
     //var scaling = Math.min(canvas.offsetWidth/bookshelf.width,canvas.offsetHeight/bookshelf.height);
@@ -1573,7 +1810,10 @@ var realToScreen = (function() {
   };
 })();
 
-//pointer.mouseMoved = checkHover;
+pointer.mouseMoved = function() {
+  checkHover();
+  dragHover();
+}
 
 var dragHover = (function() {
   var coord = vec2.create();
@@ -1598,8 +1838,11 @@ var checkHover = (function() {
         realToScreen(pt.x,pt.y,coord);
         var dx = pointer.mouseX-coord[0];
         var dy = pointer.mouseY-coord[1];
-        if(dx*dx+dy*dy < 10*10) {
+        if(dx*dx+dy*dy < 15*15) {
           selectedPt = i;
+        console.log(dx + " " + dy);
+          
+          document.getElementById("selected").innerHTML = selectedPt;
         }
       }
     }
@@ -5815,8 +6058,8 @@ var centroidal = (function() {
         var dx = Math.min(Math.max(Math.random(.1),centroid[0]),width-Math.random(.1))-pt.x;
         var dy = Math.min(Math.max(Math.random(.1),centroid[1]),height-Math.random(.1))-pt.y;
         if(dx*dx+dy*dy > 16) {
-          pt.x += dx*.25;
-          pt.y += dy*.25;
+          pt.x += dx*.1;
+          pt.y += dy*.1;
         }
       }
     }
@@ -5843,7 +6086,7 @@ var buildCells = function() {
     for(var j=0;j<3;++j) {
       var pt = t.points_[j];
       if(!pt.fixed && !pt.boundary) {
-        if(!pt.cell){
+        if(!pt.cell) {
           buildCell(pt,t);
         }
       }

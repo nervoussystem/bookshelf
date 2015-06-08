@@ -323,8 +323,8 @@ var centroidal = (function() {
         var dx = Math.min(Math.max(Math.random(.1),centroid[0]),width-Math.random(.1))-pt.x;
         var dy = Math.min(Math.max(Math.random(.1),centroid[1]),height-Math.random(.1))-pt.y;
         if(dx*dx+dy*dy > 16) {
-          pt.x += dx*.25;
-          pt.y += dy*.25;
+          pt.x += dx*.1;
+          pt.y += dy*.1;
         }
       }
     }
@@ -351,7 +351,7 @@ var buildCells = function() {
     for(var j=0;j<3;++j) {
       var pt = t.points_[j];
       if(!pt.fixed && !pt.boundary) {
-        if(!pt.cell){
+        if(!pt.cell) {
           buildCell(pt,t);
         }
       }

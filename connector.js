@@ -10,18 +10,18 @@ var text = require("./text.js");
 var poly2tri = require("./poly2tri.js");
 var SweepContext = poly2tri.SweepContext;
 
-var woodWidth = 12.2;
-var conLen = 35; //45
-var conOffset = 12;
-var conWidth = 12;//20
-var shelfOffset = 12;
+var woodWidth = 5.25;//6.35;//12.2;
+var conLen = 25; //45
+var conOffset = 8;//12;
+var conWidth = 8;//12;//20
+var shelfOffset = 7;//10;//13;
 var printTolerance = 0;
-var labelHeight = 5;
-var filletRadius = 9;
+var labelHeight = 3.1;
+var filletRadius = 7;//9;
 
-var toothWidth = 2.5;
-var toothDepth = 2.5;
-var toothOffset = 12.25;
+var toothWidth = 2.4;//2.5;
+var toothDepth = 1.4;//2.5;
+var toothOffset = 11;//12.25;
 
 var connectorTris = [];
 function initConnector(gl) {

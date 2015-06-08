@@ -21,6 +21,7 @@ function init() {
   var widthSlider = document.getElementById("widthSlider");
   var heightSlider = document.getElementById("heightSlider");
   var depthSlider = document.getElementById("depthSlider");
+  var angleSlider = document.getElementById("angleSlider");
   var widthOut = document.getElementById("widthOut");
   var heightOut = document.getElementById("heightOut");
   var depthOut = document.getElementById("depthOut");
@@ -37,10 +38,15 @@ function init() {
   depthSlider.max = 600;
   depthSlider.value = bookshelf.depth;
 
+  angleSlider.min = 0;
+  angleSlider.max = 30;
+  angleSlider.value = bookshelf.flattenAngle*180/Math.PI;
   
   widthSlider.addEventListener("input", function() {bookshelf.setWidth(parseFloat(this.value));setBookshelfWidthUI();}, false);
   heightSlider.addEventListener("input", function() {bookshelf.setHeight(parseFloat(this.value));setBookshelfHeightUI();}, false);
   depthSlider.addEventListener("input", function() {bookshelf.setDepth(parseFloat(this.value));setBookshelfDepthUI();}, false);
+
+  angleSlider.addEventListener("input", function() {bookshelf.flattenAngle = parseFloat(this.value)*Math.PI/180.0;}, false);
   
   //person enters text in width input box
   widthOut.addEventListener("change", function() {
@@ -68,7 +74,7 @@ function init() {
 		.to( {x:val},2000 )
 		.easing( TWEEN.Easing.Cubic.InOut  )
 		.onUpdate( function() {
-			bookshelf.setHeight(this.x);
+			bookshelf.setHeight(parseFloat(this.x));
 			heightSlider.value = this.x;
 		})
 		.start();
