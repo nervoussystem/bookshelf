@@ -1165,10 +1165,20 @@ var createConnector2D = (function(pdf) {
   }
 })();
 
+var setTolerance = function(tol) {
+  printTolerance = tol;
+}
+
+var getTolerance = function() {
+  return printTolerance;
+}
+
 exports.getShelfLength = getShelfLength;
 exports.createConnector = createConnector;
 exports.initConnector = initConnector;
 exports.shelfOffset = shelfOffset;
+exports.setTolerance = setTolerance;
+exports.getTolerance = getTolerance;
 },{"../js/gl-matrix-min.js":14,"./nurbs.js":9,"./poly2tri.js":10,"./text.js":11,"./vboMesh.js":12}],5:[function(require,module,exports){
 var gl;
 var ext = null;
@@ -1217,6 +1227,8 @@ var voronoi = require('./voronoi.js');
 var TWEEN = require('tween.js');
 var colorSet = require("./colorSet.js");
 
+var saveFunction;
+
 var connectorColors = [
 {"name": "white", "r":255, "g":255, "b":255},
 {"name": "black", "r":0, "g":0, "b":0},
@@ -1261,6 +1273,8 @@ function init() {
   depthSlider.addEventListener("input", function() {bookshelf.setDepth(parseFloat(this.value));setBookshelfDepthUI();}, false);
 
   angleSlider.addEventListener("input", function() {bookshelf.flattenAngle = parseFloat(this.value)*Math.PI/180.0;}, false);
+  
+  document.getElementById("saveButton").addEventListener("click", function() {saveFunction();}, false);
   
   //person enters text in width input box
   widthOut.addEventListener("change", function() {
@@ -1376,6 +1390,7 @@ function setColorCallback(func){
 exports.init = init;
 exports.setNumCellsUI = setNumCellsUI;
 exports.setColorCallback = setColorCallback;
+exports.setSaveFunction = function(saveFunc) {saveFunction = saveFunc;};
 
 },{"./bookshelf.js":1,"./colorSet.js":3,"./voronoi.js":13,"tween.js":8}],7:[function(require,module,exports){
 "use strict"
@@ -1442,11 +1457,16 @@ function init() {
   //setupGui();
   
   gui.setColorCallback(setConnectorColor);
+  gui.setSaveFunction(save);
   gui.init();
   colorShader = glShader.loadShader(gl,"../shaders/simpleColor.vert","../shaders/simpleColor.frag");
   phongShader = glShader.loadShader(gl,"../shaders/phongSimple.vert","../shaders/phongSimple.frag");
   vboMesh.setGL(gl);
+  var loadId = getUrlVars()['id'];
   initVoronoi();
+  if(loadId) {
+    load(loadId);
+  }
   connector.initConnector(gl);
   
   voronoiEdges = vboMesh.create();
@@ -1476,7 +1496,15 @@ function initCircle() {
 
 function step() {
   requestAnimationFrame(step);
-  vec3.set(camera.center,bookshelf.width*0.5,bookshelf.height*0.5,bookshelf.depth*0.5);
+  var maxX = -9e9, minX = 9e9, maxY = -9e9, minY = 9e9;
+  for(var i=0;i<voronoi.boundary.length;++i) {
+    var pt = voronoi.boundary[i];
+    maxX = Math.max(maxX, pt[0]);
+    minX = Math.min(minX, pt[0]);
+    maxY = Math.max(maxY, pt[1]);
+    minY = Math.min(minY, pt[1]);
+  }
+  vec3.set(camera.center,(maxX+minX)*0.5,(maxY+minY)*0.5,bookshelf.depth*0.5);
   camera.step();
   checkHover();
   dragHover();
@@ -1492,6 +1520,8 @@ function step() {
   drawShelves();
   draw();
   gui.setNumCellsUI();
+  
+  document.getElementById("selected").innerHTML = getTotalWood();
 }
 
 function onDocumentDrop(event) {
@@ -1825,7 +1855,7 @@ function draw3d() {
   
   phongShader.begin();
   mat4.identity(mvMatrix);
-  var maxDim = Math.max(bookshelf.width,bookshelf.height)*0.5+100;
+  var maxDim = voronoi.boundary.reduce(function(prev,curr, index, array) {return Math.max(prev, curr[0], curr[1]);},0)*0.5+100;
   mat4.ortho(pMatrix,-maxDim,maxDim,maxDim,-maxDim,-3000,3000);
   camera.feed(mvMatrix);
   //set color
@@ -2063,6 +2093,102 @@ function initVoronoi() {
   voronoi.voronoi();
 }
 
+function save() {
+  
+  var saveme = {};
+  saveme.boundary = voronoi.boundary;
+  saveme.pts = [];
+  for(var i=0;i<voronoi.pts.length;++i) {
+    var pt = voronoi.pts[i];
+    saveme.pts.push(pt.x);
+    saveme.pts.push(pt.y);
+  }
+  saveme.woodWidth = bookshelf.woodWidth;
+  saveme.tolerance = connector.getTolerance();
+  
+  var xhr = new XMLHttpRequest();
+	xhr.open("POST", "api.php",true); 
+	var data = new FormData();
+	data.append("action", "save");
+	data.append("designData", JSON.stringify(saveme));
+  /*
+	//var imageData = gl.getImageData(canvas2d.offsetWidth,0,canvas2d.offsetWidth,canvas2d.offsetHeight);
+	var pixels = new Uint8Array(canvas2d.offsetWidth*canvas2d.offsetHeight*4);
+	gl.readPixels(canvas2d.offsetWidth,0,canvas2d.offsetWidth,canvas2d.offsetHeight,gl.RGBA, gl.UNSIGNED_BYTE,pixels);
+	var imageData = context.createImageData(canvas2d.offsetWidth,canvas2d.offsetHeight);
+	for(var i=0,j;i<canvas2d.offsetWidth;++i) {
+		for(j=0;j<canvas2d.offsetHeight;++j) {
+			var index1 = (canvas2d.offsetWidth*j+i)*4;
+			var index2 = (canvas2d.offsetWidth*(canvas2d.offsetHeight-1-j)+i)*4;
+			imageData.data[index1] = pixels[index2];
+			imageData.data[index1+1] = pixels[index2+1];
+			imageData.data[index1+2] = pixels[index2+2];
+			imageData.data[index1+3] = pixels[index2+3];
+		}
+	}
+	context.putImageData(imageData,0,0);
+	
+	data.append("imageData", (canvas2d.toDataURL("image/png").split(","))[1]);
+  */
+  
+	//need to do something on error condition
+	xhr.onreadystatechange = function() {
+		if(xhr.readyState == 4 && xhr.status == 200) {
+			var response =  xhr.responseText;
+			var stuff = response.split(",");
+			if(response == "error") {
+        return;
+      }
+      var lastSaveId = stuff[0];
+			alert("saved id: " + lastSaveId);
+		}
+	};
+	xhr.send(data);
+}
+
+function load(id) {
+  var xhr = new XMLHttpRequest();
+	xhr.open("POST", "api.php",true); 
+	var data = new FormData();
+	data.append("action", "load");
+  data.append("id", id);
+  xhr.onreadystatechange = function() {
+		if(xhr.readyState == 4 && xhr.status == 200) {
+			var response =  xhr.responseText;
+			if(response == "error") {
+        return;
+      }
+      loadJSON(response);
+		}
+	};
+	xhr.send(data);
+}
+
+function loadJSON(str) {
+  var loadObj = JSON.parse(str);
+  voronoi.boundary.length = 0;
+  for(var i=0;i<loadObj.boundary.length;++i) {
+    voronoi.boundary.push(loadObj.boundary[i]);
+  }
+  voronoi.pts.length = 0;
+  for(var i=0;i<loadObj.pts.length;) {
+    var x = loadObj.pts[i++];
+    var y = loadObj.pts[i++];
+    voronoi.pts.push({x:x,y:y,on:true});
+  }
+  voronoi.updateOutsidePts();
+  bookshelf.woodWidth = loadObj.woodWidth;
+  connector.setTolerance(loadObj.tolerance);
+}
+
+function getUrlVars() {
+  var vars = {};
+  var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+  vars[key] = value;
+  });
+  return vars;
+}
+
 
 function keyPress(event) {
   switch(event.which) {
@@ -2079,7 +2205,27 @@ function keyPress(event) {
   heightSlide.oninput = function() {setHeight(parseFloat(this.value));}
 }*/
 
-
+function getTotalWood() {
+  var lens = [];
+  var accuracy = 3.175;
+  for(var i=0;i<voronoi.mesh.edges.length;++i) {
+    var e = voronoi.mesh.edges[i];
+    if(e.v.e) {
+      var len = vec2.dist(e.v.pos,e.pair.v.pos)-connector.shelfOffset*2;
+      len /= accuracy;
+      len = Math.floor(len);
+      len *= accuracy;
+      lens[e.info.label] = len;
+    }
+  }
+  var totalLen = 0;
+  for(var i=0;i<lens.length;++i) {
+    if(lens[i]) {
+      totalLen += (lens[i]/25.4);
+    }
+  }
+  return totalLen*bookshelf.depth/25.4;
+}
 
 function download() {
   var lenStr = "";
@@ -2244,7 +2390,6 @@ var checkHover = (function() {
           selectedPt = i;
         //console.log(dx + " " + dy);
           
-          document.getElementById("selected").innerHTML = selectedPt;
         }
       }
     }
@@ -6188,24 +6333,39 @@ function init() {
   boundary.push([0,height,0]);
   boundary.push([width,height,0]);
   boundary.push([width,0,0]);
+  
+  updateOutsidePts();
+}
 
+function updateOutsidePts() {
+  //get bounding box
+  var maxX = -9e9, minX = 9e9, maxY = -9e9, minY = 9e9;
+  for(var i=0;i<boundary.length;++i) {
+    var pt = boundary[i];
+    maxX = Math.max(maxX, pt[0]);
+    minX = Math.min(minX, pt[0]);
+    maxY = Math.max(maxY, pt[1]);
+    minY = Math.min(minY, pt[1]);
+  }
+  width = maxX;
+  height = maxY;
   outsidePts.length = 0;
   var d = 5000;
-  outsidePts.push({x:0,y:-d,fixed:true,bottom:true});
-  outsidePts.push({x:width*0.5,y:-d,fixed:true,bottom:true});
-  outsidePts.push({x:width,y:-d,fixed:true,bottom:true});
+  outsidePts.push({x:minX,y:minY-d,fixed:true,bottom:true});
+  outsidePts.push({x:(minX+maxX)*0.5,y:minY-d,fixed:true,bottom:true});
+  outsidePts.push({x:maxX,y:minY-d,fixed:true,bottom:true});
 
-  outsidePts.push({x:width+d,y:0,fixed:true,right:true});
-  outsidePts.push({x:width+d,y:height*0.5,fixed:true,right:true});
-  outsidePts.push({x:width+d,y:height,fixed:true,right:true});
+  outsidePts.push({x:maxX+d,y:minY,fixed:true,right:true});
+  outsidePts.push({x:maxX+d,y:(maxY+minY)*0.5,fixed:true,right:true});
+  outsidePts.push({x:maxX+d,y:maxY,fixed:true,right:true});
 
-  outsidePts.push({x:width,y:height+d,fixed:true,top:true});
-  outsidePts.push({x:width*0.5,y:height+d,fixed:true,top:true});
-  outsidePts.push({x:0,y:height+d,fixed:true,top:true});
+  outsidePts.push({x:maxX,y:maxY+d,fixed:true,top:true});
+  outsidePts.push({x:(maxX+minX)*0.5,y:maxY+d,fixed:true,top:true});
+  outsidePts.push({x:minX,y:maxY+d,fixed:true,top:true});
 
-  outsidePts.push({x:-d,y:height,fixed:true,left:true});
-  outsidePts.push({x:-d,y:height*0.5,fixed:true,left:true});
-  outsidePts.push({x:-d,y:0,fixed:true,left:true});
+  outsidePts.push({x:minX-d,y:maxY,fixed:true,left:true});
+  outsidePts.push({x:minX-d,y:(minY+maxY)*0.5,fixed:true,left:true});
+  outsidePts.push({x:minX-d,y:minY,fixed:true,left:true});
 }
 
 var voronoi = (function() {
@@ -6996,10 +7156,12 @@ exports.init = init;
 exports.reset = reset;
 exports.voronoi = voronoi;
 exports.pts = pts;
+exports.boundary = boundary;
 exports.triangles = triangles;
 exports.setDimensions = setDimensions;
 exports.centroidal = centroidal;
 exports.mesh = voroMesh;
+exports.updateOutsidePts = updateOutsidePts;
 },{"../js/gl-matrix-min.js":14,"../js/hemesh.js":16,"./poly2tri.js":10}],14:[function(require,module,exports){
 /**
  * @fileoverview gl-matrix - High performance matrix and vector operations
@@ -7058,6 +7220,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	uses some ideas (and code) from gl-shader https://github.com/mikolalysenko/gl-shader
 	however some differences include saving uniform locations and querying gl to get uniforms and attribs instead of parsing files and uses normal syntax instead of fake operator overloading which is a confusing pattern in Javascript.
 */
+
 (function(_global) {
   "use strict";
 
@@ -7300,16 +7463,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       loadXMLDoc(fragmentFile, function(txt) {fragShader = getShader(gl, txt, "fragment");if(++loaded == 2) setupShaderProgram(gl,shaderProgram, vertShader,fragShader,function(prog) {glShader.makeShader(gl,prog,shader);})});
       return shader;
   }
-  
-  glShader.setupShader = function(gl, vertTxt, fragTxt) {
-    var shaderProgram = gl.createProgram();
-    var shader = new Shader(gl,shaderProgram);
-    
-    var vertShader = getShader(gl, vertTxt, "vertex");
-    var fragShader = getShader(gl, fragTxt, "fragment");
-    setupShaderProgram(gl,shaderProgram, vertShader,fragShader,function(prog) {glShader.makeShader(gl,prog,shader);});
-    return shader;
-  }
 
   //if(typeof(exports) !== 'undefined') {
   //    exports.glShader = glShader;
@@ -7323,6 +7476,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 var glMatrix = require('../js/gl-matrix-min.js');
 var vec3 = glMatrix.vec3;
+
 var HEMESH_NULLFACE = null;
 
 var hemesh = function() {

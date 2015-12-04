@@ -901,7 +901,17 @@ var createConnector2D = (function(pdf) {
   }
 })();
 
+var setTolerance = function(tol) {
+  printTolerance = tol;
+}
+
+var getTolerance = function() {
+  return printTolerance;
+}
+
 exports.getShelfLength = getShelfLength;
 exports.createConnector = createConnector;
 exports.initConnector = initConnector;
 exports.shelfOffset = shelfOffset;
+exports.setTolerance = setTolerance;
+exports.getTolerance = getTolerance;

@@ -3,6 +3,8 @@ var voronoi = require('./voronoi.js');
 var TWEEN = require('tween.js');
 var colorSet = require("./colorSet.js");
 
+var saveFunction;
+
 var connectorColors = [
 {"name": "white", "r":255, "g":255, "b":255},
 {"name": "black", "r":0, "g":0, "b":0},
@@ -47,6 +49,8 @@ function init() {
   depthSlider.addEventListener("input", function() {bookshelf.setDepth(parseFloat(this.value));setBookshelfDepthUI();}, false);
 
   angleSlider.addEventListener("input", function() {bookshelf.flattenAngle = parseFloat(this.value)*Math.PI/180.0;}, false);
+  
+  document.getElementById("saveButton").addEventListener("click", function() {saveFunction();}, false);
   
   //person enters text in width input box
   widthOut.addEventListener("change", function() {
@@ -162,3 +166,4 @@ function setColorCallback(func){
 exports.init = init;
 exports.setNumCellsUI = setNumCellsUI;
 exports.setColorCallback = setColorCallback;
+exports.setSaveFunction = function(saveFunc) {saveFunction = saveFunc;};

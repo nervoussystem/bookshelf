@@ -62,11 +62,16 @@ function init() {
   //setupGui();
   
   gui.setColorCallback(setConnectorColor);
+  gui.setSaveFunction(save);
   gui.init();
   colorShader = glShader.loadShader(gl,"../shaders/simpleColor.vert","../shaders/simpleColor.frag");
   phongShader = glShader.loadShader(gl,"../shaders/phongSimple.vert","../shaders/phongSimple.frag");
   vboMesh.setGL(gl);
+  var loadId = getUrlVars()['id'];
   initVoronoi();
+  if(loadId) {
+    load(loadId);
+  }
   connector.initConnector(gl);
   
   voronoiEdges = vboMesh.create();
@@ -96,7 +101,15 @@ function initCircle() {
 
 function step() {
   requestAnimationFrame(step);
-  vec3.set(camera.center,bookshelf.width*0.5,bookshelf.height*0.5,bookshelf.depth*0.5);
+  var maxX = -9e9, minX = 9e9, maxY = -9e9, minY = 9e9;
+  for(var i=0;i<voronoi.boundary.length;++i) {
+    var pt = voronoi.boundary[i];
+    maxX = Math.max(maxX, pt[0]);
+    minX = Math.min(minX, pt[0]);
+    maxY = Math.max(maxY, pt[1]);
+    minY = Math.min(minY, pt[1]);
+  }
+  vec3.set(camera.center,(maxX+minX)*0.5,(maxY+minY)*0.5,bookshelf.depth*0.5);
   camera.step();
   checkHover();
   dragHover();
@@ -112,6 +125,8 @@ function step() {
   drawShelves();
   draw();
   gui.setNumCellsUI();
+  
+  document.getElementById("selected").innerHTML = getTotalWood();
 }
 
 function onDocumentDrop(event) {
@@ -445,7 +460,7 @@ function draw3d() {
   
   phongShader.begin();
   mat4.identity(mvMatrix);
-  var maxDim = Math.max(bookshelf.width,bookshelf.height)*0.5+100;
+  var maxDim = voronoi.boundary.reduce(function(prev,curr, index, array) {return Math.max(prev, curr[0], curr[1]);},0)*0.5+100;
   mat4.ortho(pMatrix,-maxDim,maxDim,maxDim,-maxDim,-3000,3000);
   camera.feed(mvMatrix);
   //set color
@@ -683,6 +698,102 @@ function initVoronoi() {
   voronoi.voronoi();
 }
 
+function save() {
+  
+  var saveme = {};
+  saveme.boundary = voronoi.boundary;
+  saveme.pts = [];
+  for(var i=0;i<voronoi.pts.length;++i) {
+    var pt = voronoi.pts[i];
+    saveme.pts.push(pt.x);
+    saveme.pts.push(pt.y);
+  }
+  saveme.woodWidth = bookshelf.woodWidth;
+  saveme.tolerance = connector.getTolerance();
+  
+  var xhr = new XMLHttpRequest();
+	xhr.open("POST", "api.php",true); 
+	var data = new FormData();
+	data.append("action", "save");
+	data.append("designData", JSON.stringify(saveme));
+  /*
+	//var imageData = gl.getImageData(canvas2d.offsetWidth,0,canvas2d.offsetWidth,canvas2d.offsetHeight);
+	var pixels = new Uint8Array(canvas2d.offsetWidth*canvas2d.offsetHeight*4);
+	gl.readPixels(canvas2d.offsetWidth,0,canvas2d.offsetWidth,canvas2d.offsetHeight,gl.RGBA, gl.UNSIGNED_BYTE,pixels);
+	var imageData = context.createImageData(canvas2d.offsetWidth,canvas2d.offsetHeight);
+	for(var i=0,j;i<canvas2d.offsetWidth;++i) {
+		for(j=0;j<canvas2d.offsetHeight;++j) {
+			var index1 = (canvas2d.offsetWidth*j+i)*4;
+			var index2 = (canvas2d.offsetWidth*(canvas2d.offsetHeight-1-j)+i)*4;
+			imageData.data[index1] = pixels[index2];
+			imageData.data[index1+1] = pixels[index2+1];
+			imageData.data[index1+2] = pixels[index2+2];
+			imageData.data[index1+3] = pixels[index2+3];
+		}
+	}
+	context.putImageData(imageData,0,0);
+	
+	data.append("imageData", (canvas2d.toDataURL("image/png").split(","))[1]);
+  */
+  
+	//need to do something on error condition
+	xhr.onreadystatechange = function() {
+		if(xhr.readyState == 4 && xhr.status == 200) {
+			var response =  xhr.responseText;
+			var stuff = response.split(",");
+			if(response == "error") {
+        return;
+      }
+      var lastSaveId = stuff[0];
+			alert("saved id: " + lastSaveId);
+		}
+	};
+	xhr.send(data);
+}
+
+function load(id) {
+  var xhr = new XMLHttpRequest();
+	xhr.open("POST", "api.php",true); 
+	var data = new FormData();
+	data.append("action", "load");
+  data.append("id", id);
+  xhr.onreadystatechange = function() {
+		if(xhr.readyState == 4 && xhr.status == 200) {
+			var response =  xhr.responseText;
+			if(response == "error") {
+        return;
+      }
+      loadJSON(response);
+		}
+	};
+	xhr.send(data);
+}
+
+function loadJSON(str) {
+  var loadObj = JSON.parse(str);
+  voronoi.boundary.length = 0;
+  for(var i=0;i<loadObj.boundary.length;++i) {
+    voronoi.boundary.push(loadObj.boundary[i]);
+  }
+  voronoi.pts.length = 0;
+  for(var i=0;i<loadObj.pts.length;) {
+    var x = loadObj.pts[i++];
+    var y = loadObj.pts[i++];
+    voronoi.pts.push({x:x,y:y,on:true});
+  }
+  voronoi.updateOutsidePts();
+  bookshelf.woodWidth = loadObj.woodWidth;
+  connector.setTolerance(loadObj.tolerance);
+}
+
+function getUrlVars() {
+  var vars = {};
+  var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+  vars[key] = value;
+  });
+  return vars;
+}
+
 
 function keyPress(event) {
   switch(event.which) {
@@ -699,7 +810,27 @@ function keyPress(event) {
   heightSlide.oninput = function() {setHeight(parseFloat(this.value));}
 }*/
 
-
+function getTotalWood() {
+  var lens = [];
+  var accuracy = 3.175;
+  for(var i=0;i<voronoi.mesh.edges.length;++i) {
+    var e = voronoi.mesh.edges[i];
+    if(e.v.e) {
+      var len = vec2.dist(e.v.pos,e.pair.v.pos)-connector.shelfOffset*2;
+      len /= accuracy;
+      len = Math.floor(len);
+      len *= accuracy;
+      lens[e.info.label] = len;
+    }
+  }
+  var totalLen = 0;
+  for(var i=0;i<lens.length;++i) {
+    if(lens[i]) {
+      totalLen += (lens[i]/25.4);
+    }
+  }
+  return totalLen*bookshelf.depth/25.4;
+}
 
 function download() {
   var lenStr = "";
@@ -864,7 +995,6 @@ var checkHover = (function() {
           selectedPt = i;
         //console.log(dx + " " + dy);
           
-          document.getElementById("selected").innerHTML = selectedPt;
         }
       }
     }

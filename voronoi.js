@@ -51,24 +51,39 @@ function init() {
   boundary.push([0,height,0]);
   boundary.push([width,height,0]);
   boundary.push([width,0,0]);
+  
+  updateOutsidePts();
+}
 
+function updateOutsidePts() {
+  //get bounding box
+  var maxX = -9e9, minX = 9e9, maxY = -9e9, minY = 9e9;
+  for(var i=0;i<boundary.length;++i) {
+    var pt = boundary[i];
+    maxX = Math.max(maxX, pt[0]);
+    minX = Math.min(minX, pt[0]);
+    maxY = Math.max(maxY, pt[1]);
+    minY = Math.min(minY, pt[1]);
+  }
+  width = maxX;
+  height = maxY;
   outsidePts.length = 0;
   var d = 5000;
-  outsidePts.push({x:0,y:-d,fixed:true,bottom:true});
-  outsidePts.push({x:width*0.5,y:-d,fixed:true,bottom:true});
-  outsidePts.push({x:width,y:-d,fixed:true,bottom:true});
+  outsidePts.push({x:minX,y:minY-d,fixed:true,bottom:true});
+  outsidePts.push({x:(minX+maxX)*0.5,y:minY-d,fixed:true,bottom:true});
+  outsidePts.push({x:maxX,y:minY-d,fixed:true,bottom:true});
 
-  outsidePts.push({x:width+d,y:0,fixed:true,right:true});
-  outsidePts.push({x:width+d,y:height*0.5,fixed:true,right:true});
-  outsidePts.push({x:width+d,y:height,fixed:true,right:true});
+  outsidePts.push({x:maxX+d,y:minY,fixed:true,right:true});
+  outsidePts.push({x:maxX+d,y:(maxY+minY)*0.5,fixed:true,right:true});
+  outsidePts.push({x:maxX+d,y:maxY,fixed:true,right:true});
 
-  outsidePts.push({x:width,y:height+d,fixed:true,top:true});
-  outsidePts.push({x:width*0.5,y:height+d,fixed:true,top:true});
-  outsidePts.push({x:0,y:height+d,fixed:true,top:true});
+  outsidePts.push({x:maxX,y:maxY+d,fixed:true,top:true});
+  outsidePts.push({x:(maxX+minX)*0.5,y:maxY+d,fixed:true,top:true});
+  outsidePts.push({x:minX,y:maxY+d,fixed:true,top:true});
 
-  outsidePts.push({x:-d,y:height,fixed:true,left:true});
-  outsidePts.push({x:-d,y:height*0.5,fixed:true,left:true});
-  outsidePts.push({x:-d,y:0,fixed:true,left:true});
+  outsidePts.push({x:minX-d,y:maxY,fixed:true,left:true});
+  outsidePts.push({x:minX-d,y:(minY+maxY)*0.5,fixed:true,left:true});
+  outsidePts.push({x:minX-d,y:minY,fixed:true,left:true});
 }
 
 var voronoi = (function() {
@@ -859,7 +874,9 @@ exports.init = init;
 exports.reset = reset;
 exports.voronoi = voronoi;
 exports.pts = pts;
+exports.boundary = boundary;
 exports.triangles = triangles;
 exports.setDimensions = setDimensions;
 exports.centroidal = centroidal;
 exports.mesh = voroMesh;
+exports.updateOutsidePts = updateOutsidePts;
