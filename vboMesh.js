@@ -332,7 +332,7 @@ vboMesh.computeSmoothNormals = (function() {
             vec3.set(p3,vbo.vertexData[i3],vbo.vertexData[i3+1], vbo.vertexData[i3+2]);
             
             planeNormal(norm, p1,p2,p3);
-            vec3.normalize(norm,norm);
+            //vec3.normalize(norm,norm);
             
             vbo.normalData[i1] += norm[0];
             vbo.normalData[i1+1] += norm[1];

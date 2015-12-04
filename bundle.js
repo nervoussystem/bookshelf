@@ -8,7 +8,7 @@ bookshelf.width = 2*12*25.4; //bookshelf width in mm
 bookshelf.height = 2*12*25.4; //bookshelf height in mm
 bookshelf.depth = 254; //bookshelf depth in mm
 
-bookshelf.woodWidth = 5.25;//6.35;//12.2; //thickness of the wood sheets in mm
+bookshelf.woodWidth = 5.95;//6.35;//12.2; //thickness of the wood sheets in mm
 bookshelf.flattenAngle = Math.PI*0.1;
 
 /*
@@ -274,7 +274,7 @@ var text = require("./text.js");
 var poly2tri = require("./poly2tri.js");
 var SweepContext = poly2tri.SweepContext;
 
-var woodWidth = 5.25;//6.35;//12.2;
+var woodWidth = 5.95;//6.35;//12.2;
 var conLen = 25; //45
 var conOffset = 8;//12;
 var conWidth = 8;//12;//20
@@ -283,10 +283,12 @@ var printTolerance = 0;
 var labelHeight = 3.1;
 var filletRadius = 7;//9;
 
-var toothWidth = 2.4;//2.5;
+var toothWidth = 2.35;//2.5;
 var toothDepth = 1.4;//2.5;
 var toothOffset = 11;//12.25;
 
+var bottomLip = .3;
+var bottomLipH = .6;
 var connectorTris = [];
 function initConnector(gl) {
   text.init(gl);
@@ -298,6 +300,8 @@ function initConnector(gl) {
 }
 
 var accuracy = 3.175;
+
+
 
 var createConnector = (function() {
   var maxValence = 7;
@@ -311,7 +315,11 @@ var createConnector = (function() {
   var labels = new Array(maxValence);
   var pt = vec3.create();
   var pt2 = vec3.create();
+  var pt3 = vec3.create();
   var dir, nDir;
+  var dir1 = vec3.create();
+  var dir2 = vec3.create();
+  
   var perp = vec3.create();
   var bisector = vec3.create();
   var e,startE;
@@ -335,7 +343,10 @@ var createConnector = (function() {
       }
       e = e.pair;
     } while(e != startE);
-    if(index < 2) return;
+    if(index < 2) {
+      console.log("insufficient legs on connector");
+      return;
+    }
     var numLegs = index;
     
     var baseIndex = vboOut.numVertices;
@@ -476,22 +487,29 @@ var createConnector = (function() {
       vec2.set(perp,dir[1],-dir[0]);
       vec3.scaleAndAdd(pt,center, dir, shelfOffset-labelSpace);
       vec2.scaleAndAdd(pt,pt,perp,labelHeight);
+      pt[2] = -bottomLipH;
       addConnectorPt(vboOut,pt);
       
       vec2.scaleAndAdd(pt,pt,perp,-labelHeight);
+      pt[2] = -bottomLipH;
       addConnectorPt(vboOut,pt);
 
       vec2.scaleAndAdd(pt,pt,perp,-labelHeight);
+      pt[2] = -bottomLipH;
       addConnectorPt(vboOut,pt);
       
       vec2.scaleAndAdd(pt,pt,dir,-labelHeight);
+      pt[2] = -bottomLipH;
       addConnectorPt(vboOut,pt);
       
       vec2.scaleAndAdd(pt,pt,perp,labelHeight);
+      pt[2] = -bottomLipH;
       addConnectorPt(vboOut,pt);
 
       vec2.scaleAndAdd(pt,pt,perp,labelHeight);
+      pt[2] = -bottomLipH;
       addConnectorPt(vboOut,pt);
+      pt[2] = -bottomLipH;
       vec3.copy(labelsPt[i],pt);  
     }
     
@@ -504,6 +522,7 @@ var createConnector = (function() {
       vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex+iNext*2,baseIndex+iNext*2+1);
     }
     */
+    
     var divs = 4;
     for(var i=0;i<numPts;++i) {
       var iNext = (i+1)%numPts;
@@ -532,6 +551,35 @@ var createConnector = (function() {
       vboMesh.addTriangle(vboOut,baseIndex3+i*divs+divs-1,baseIndex3+iNext*divs+divs-1,baseIndex+iNext*2+1);
     }
     
+    var baseIndex4 = vboOut.numVertices;
+    //add bottom lip
+    for(var i=0;i<numPts;++i) {
+      var iNext = (i+1)%numPts;
+      var iPrev = (i-1+numPts)%numPts;
+      vboMesh.getVertex(pt,vboOut,baseIndex+i*2);
+      vboMesh.getVertex(pt2,vboOut,baseIndex+iNext*2);
+      vboMesh.getVertex(pt3,vboOut,baseIndex+iPrev*2);
+      
+      //offset in
+      vec2.sub(dir1,pt2,pt);
+      vec2.sub(dir2,pt,pt3);
+      vec2.normalize(dir1,dir1);
+      vec2.normalize(dir2,dir2);
+      
+      vec2.add(bisector,dir1,dir2);
+      var temp = bisector[0];
+      bisector[0] = -bisector[1];
+      bisector[1] = temp;
+
+      var sinA = Math.abs(bisector[0]*dir1[1]-bisector[1]*dir1[0]);
+      vec3.scaleAndAdd(pt,pt,bisector,bottomLip/sinA);
+      
+      pt[2] = -bottomLipH;
+      vboMesh.addVertex(vboOut,pt);
+      
+      vboMesh.addTriangle(vboOut,baseIndex+i*2, baseIndex4+i, baseIndex4+iNext);
+      vboMesh.addTriangle(vboOut,baseIndex+i*2, baseIndex4+iNext, baseIndex+iNext*2);
+    }
     //cover top hole
     for(var i=0;i<numLegs;++i) {
       vboMesh.addTriangle(vboOut, baseIndex2+i*12+1,baseIndex2+i*12+3,baseIndex2+i*12+9);
@@ -548,11 +596,25 @@ var createConnector = (function() {
       var i1 = faceVbo.indexData[i++];
       var i2 = faceVbo.indexData[i++];
       var i3 = faceVbo.indexData[i++];
-      vboMesh.addTriangle(vboOut, baseIndex+i1*2, baseIndex+i3*2, baseIndex+i2*2);
+      //vboMesh.addTriangle(vboOut, baseIndex+i1*2, baseIndex+i3*2, baseIndex+i2*2);
+      var bi1 = baseIndex4+i1;
+      var bi2 = baseIndex4+i3;
+      var bi3 = baseIndex4+i2;
+      if(i1 >= numPts) {
+        bi1 = baseIndex+i1*2;
+      }
+      if(i3 >= numPts) {
+        bi2 = baseIndex+i3*2;
+      }
+      if(i2 >= numPts) {
+        bi3 = baseIndex+i2*2;
+      }
+      vboMesh.addTriangle(vboOut, bi1,bi2,bi3);
       vboMesh.addTriangle(vboOut, baseIndex+i1*2+1, baseIndex+i2*2+1, baseIndex+i3*2+1);      
     }
     
     //add labels
+    
     for(var i=0;i<numLegs;++i) {
       dir = dirs[i];
       var tens = Math.floor(labels[i]/10)%10;
@@ -573,6 +635,7 @@ var createConnector = (function() {
       mat4.scale(trans,trans,[-labelHeight,labelHeight,1]);
       vboMesh.addMeshTransform(vboOut,text.numVbos[ones], trans);
     }
+    
   }
 })();
 
@@ -764,6 +827,343 @@ var getShelfLength = function(e) {
   var aLen = accuracy * Math.floor(cLen / accuracy);
   return aLen;
 }
+
+function save2D() {
+  var doc = new jsPDF();
+}
+
+var createConnector2D = (function(pdf) {
+  var maxValence = 7;
+  var dirs = [];
+  var labelsPt = new Array(maxValence);
+  for(var i=0;i<maxValence;++i) {
+    dirs[i] = vec3.create();
+    labelsPt[i] = vec3.create();
+  }
+  var lengths = new Array(maxValence);
+  var labels = new Array(maxValence);
+  var pt = vec3.create();
+  var pt2 = vec3.create();
+  var pt3 = vec3.create();
+  var dir, nDir;
+  var dir1 = vec3.create();
+  var dir2 = vec3.create();
+  
+  var perp = vec3.create();
+  var bisector = vec3.create();
+  var e,startE;
+  var trans = mat4.create();
+  var cLen, aLen, lenDiff, len;
+  return function createConnector(v,doc) {
+    startE = v.e;
+    e = startE;
+    var center = v.pos;
+    var index = 0;
+    do {
+      e = e.next;
+      if((e.face && e.face.on) || (e.pair.face && e.pair.face.on)) {
+        vec3.sub(dirs[index],e.v.pos,center);
+        len = vec3.len(dirs[index]);
+        vec3.scale(dirs[index],dirs[index],1.0/len);
+        labels[index] = e.info.label;
+        //console.log(e.info.label);
+        lengths[index] = len;
+        index++;
+      }
+      e = e.pair;
+    } while(e != startE);
+    if(index < 2) return;
+    var numLegs = index;
+    
+    var baseIndex = vboOut.numVertices;
+    var numPts = 0;
+    
+    for(var i=0;i<numLegs;++i) {
+      //make points
+      dir = dirs[i];
+      var iNext = (i+1)%numLegs;
+      nDir = dirs[iNext];
+      
+      cLen = lengths[i]-shelfOffset*2;
+      aLen = accuracy * Math.floor(cLen / accuracy);
+      lenDiff = (cLen-aLen)*0.5;
+      var cConLen = conLen;
+      cConLen = Math.min(cConLen, aLen*0.9*0.5);
+      
+      vec2.set(perp,dir[1],-dir[0]);
+      vec3.scaleAndAdd(pt,center, dir, cConLen+shelfOffset+lenDiff);
+      vec2.scaleAndAdd(pt,pt,perp,woodWidth*0.5+printTolerance);      
+      //addConnectorPt(vboOut,pt);
+      vboMesh.addVertex(vboOut,pt);
+      vec2.scaleAndAdd(pt2,pt,dir,-filletRadius);
+      pt2[2] = conWidth;
+      vboMesh.addVertex(vboOut,pt2);
+      numPts++;
+      
+      //tooth
+      vec2.scaleAndAdd(pt,pt,dir,-cConLen+toothOffset+toothWidth);      
+      addConnectorPt(vboOut,pt);
+      numPts++;
+
+      vec2.scaleAndAdd(pt,pt,perp,-toothDepth);
+      addConnectorPt(vboOut,pt);
+      numPts++;
+      
+      vec2.scaleAndAdd(pt,pt,dir,-toothWidth);
+      addConnectorPt(vboOut,pt);
+      numPts++;
+      
+      vec2.scaleAndAdd(pt,pt,perp,toothDepth);
+      addConnectorPt(vboOut,pt);
+      numPts++;
+            
+      //end tooth
+      vec2.scaleAndAdd(pt,pt,dir,-toothOffset); //cConLet
+      addConnectorPt(vboOut,pt);
+      numPts++;
+      
+      vec2.scaleAndAdd(pt,pt,perp,-(woodWidth+printTolerance*2));
+      addConnectorPt(vboOut,pt);
+      numPts++;
+
+      
+      //make curve
+      var crv = nurbs.createCrv(null, 2);
+      var crvTop = nurbs.createCrv(null, 2);
+      
+      vec2.scaleAndAdd(pt,pt,dir,cConLen);
+      //addConnectorPt(vboOut,pt);
+      vboMesh.addVertex(vboOut,pt);
+      vec2.scaleAndAdd(pt2,pt,dir,-filletRadius);
+      pt2[2] = conWidth;
+      vboMesh.addVertex(vboOut,pt2);
+
+      
+      numPts++;
+      
+      nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
+
+      vec2.scaleAndAdd(pt,pt,perp,-conOffset);
+      vec2.scaleAndAdd(pt2,pt2,perp,-conOffset+filletRadius);
+      //addConnectorPt(vboOut,pt);
+      //numPts++;
+
+      nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
+      
+      //get offset
+      bisector[0] = dir[0]-nDir[0];
+      bisector[1] = dir[1]-nDir[1];
+      vec2.normalize(bisector,bisector);
+      //rotate 90
+      var temp = bisector[0];
+      bisector[0] = -bisector[1];
+      bisector[1] = temp;
+      var sinA = Math.abs(bisector[0]*dir[1]-bisector[1]*dir[0]);
+      vec3.scaleAndAdd(pt,center,bisector,(woodWidth*0.5+conOffset)/sinA);
+      vec2.scaleAndAdd(pt2,center,bisector,(woodWidth*0.5+(conOffset-filletRadius))/sinA);
+
+      nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
+      
+      //addConnectorPt(vboOut,pt);
+      //numPts++;
+      
+      //deal with next leg
+      cLen = lengths[iNext]-shelfOffset*2;
+      aLen = accuracy * Math.floor(cLen / accuracy);
+      lenDiff = (cLen-aLen)*0.5;
+      cConLen = Math.min(conLen, aLen*0.9*0.5);
+
+      vec2.set(perp,nDir[1],-nDir[0]);
+      vec3.scaleAndAdd(pt,center, nDir, cConLen+shelfOffset+lenDiff);
+      vec2.scaleAndAdd(pt,pt,perp,woodWidth*0.5+printTolerance+conOffset);      
+      vec2.scaleAndAdd(pt2,pt,perp,-filletRadius);
+      vec2.scaleAndAdd(pt2,pt2,nDir,-filletRadius);
+      
+      nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
+      vec2.scaleAndAdd(pt,pt,perp,-conOffset);      
+      vec2.scaleAndAdd(pt2,pt2,perp,-(conOffset-filletRadius));      
+      nurbs.addPoint(crv,pt);
+      nurbs.addPoint(crvTop,pt2);
+      
+      var domain = nurbs.domain(crv);
+      for(var j=1;j<20;++j) {
+        var u = j/20.0*(domain[1]-domain[0])+domain[0];
+        nurbs.evaluateCrv(crv,u,pt);
+        nurbs.evaluateCrv(crvTop,u,pt2);
+        //addConnectorPt(vboOut,pt);
+        vboMesh.addVertex(vboOut,pt);
+        vboMesh.addVertex(vboOut,pt2);
+        
+        numPts++;
+        
+      }
+      
+    }
+    var baseIndex2 = vboOut.numVertices;
+
+    //add label holes
+    var labelSpace = 1;
+    for(var i=0;i<numLegs;++i) {
+      //make points
+      dir = dirs[i];
+      vec2.set(perp,dir[1],-dir[0]);
+      vec3.scaleAndAdd(pt,center, dir, shelfOffset-labelSpace);
+      vec2.scaleAndAdd(pt,pt,perp,labelHeight);
+      pt[2] = -bottomLipH;
+      addConnectorPt(vboOut,pt);
+      
+      vec2.scaleAndAdd(pt,pt,perp,-labelHeight);
+      pt[2] = -bottomLipH;
+      addConnectorPt(vboOut,pt);
+
+      vec2.scaleAndAdd(pt,pt,perp,-labelHeight);
+      pt[2] = -bottomLipH;
+      addConnectorPt(vboOut,pt);
+      
+      vec2.scaleAndAdd(pt,pt,dir,-labelHeight);
+      pt[2] = -bottomLipH;
+      addConnectorPt(vboOut,pt);
+      
+      vec2.scaleAndAdd(pt,pt,perp,labelHeight);
+      pt[2] = -bottomLipH;
+      addConnectorPt(vboOut,pt);
+
+      vec2.scaleAndAdd(pt,pt,perp,labelHeight);
+      pt[2] = -bottomLipH;
+      addConnectorPt(vboOut,pt);
+      pt[2] = -bottomLipH;
+      vec3.copy(labelsPt[i],pt);  
+    }
+    
+    var baseIndex3 = vboOut.numVertices;
+    //stitch sides
+    /*
+    for(var i=0;i<numPts;++i) {
+      var iNext = (i+1)%numPts;
+      vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex+iNext*2+1,baseIndex+i*2+1);
+      vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex+iNext*2,baseIndex+iNext*2+1);
+    }
+    */
+    
+    var divs = 4;
+    for(var i=0;i<numPts;++i) {
+      var iNext = (i+1)%numPts;
+      vboMesh.getVertex(pt,vboOut,baseIndex+i*2);
+      vboMesh.getVertex(pt2,vboOut,baseIndex+i*2+1);
+      vec2.sub(perp,pt,pt2);
+      
+      vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex3+iNext*divs,baseIndex3+i*divs);
+      vboMesh.addTriangle(vboOut,baseIndex+i*2,baseIndex+iNext*2,baseIndex3+iNext*divs);
+      for(var j=0;j<divs;++j) {
+        var angle = (j+1)*Math.PI*0.5/(divs+1);
+        //redundant could precompute
+        var cosA = Math.cos(angle);
+        var sinA = Math.sin(angle);
+        vec2.scaleAndAdd(pt,pt2,perp,cosA);
+        pt[2] = sinA*pt2[2];
+        
+        vboMesh.addVertex(vboOut,pt);
+        if(j<divs-1) {
+          vboMesh.addTriangle(vboOut,baseIndex3+i*divs+j,baseIndex3+iNext*divs+j+1,baseIndex3+i*divs+j+1);
+          vboMesh.addTriangle(vboOut,baseIndex3+i*divs+j,baseIndex3+iNext*divs+j,baseIndex3+iNext*divs+j+1);
+        }
+
+      }
+      vboMesh.addTriangle(vboOut,baseIndex3+i*divs+divs-1,baseIndex+iNext*2+1,baseIndex+i*2+1);
+      vboMesh.addTriangle(vboOut,baseIndex3+i*divs+divs-1,baseIndex3+iNext*divs+divs-1,baseIndex+iNext*2+1);
+    }
+    
+    var baseIndex4 = vboOut.numVertices;
+    //add bottom lip
+    for(var i=0;i<numPts;++i) {
+      var iNext = (i+1)%numPts;
+      var iPrev = (i-1+numPts)%numPts;
+      vboMesh.getVertex(pt,vboOut,baseIndex+i*2);
+      vboMesh.getVertex(pt2,vboOut,baseIndex+iNext*2);
+      vboMesh.getVertex(pt3,vboOut,baseIndex+iPrev*2);
+      
+      //offset in
+      vec2.sub(dir1,pt2,pt);
+      vec2.sub(dir2,pt,pt3);
+      vec2.normalize(dir1,dir1);
+      vec2.normalize(dir2,dir2);
+      
+      vec2.add(bisector,dir1,dir2);
+      var temp = bisector[0];
+      bisector[0] = -bisector[1];
+      bisector[1] = temp;
+
+      var sinA = Math.abs(bisector[0]*dir1[1]-bisector[1]*dir1[0]);
+      vec3.scaleAndAdd(pt,pt,bisector,bottomLip/sinA);
+      
+      pt[2] = -bottomLipH;
+      vboMesh.addVertex(vboOut,pt);
+      
+      vboMesh.addTriangle(vboOut,baseIndex+i*2, baseIndex4+i, baseIndex4+iNext);
+      vboMesh.addTriangle(vboOut,baseIndex+i*2, baseIndex4+iNext, baseIndex+iNext*2);
+    }
+    //cover top hole
+    for(var i=0;i<numLegs;++i) {
+      vboMesh.addTriangle(vboOut, baseIndex2+i*12+1,baseIndex2+i*12+3,baseIndex2+i*12+9);
+      vboMesh.addTriangle(vboOut, baseIndex2+i*12+1,baseIndex2+i*12+9,baseIndex2+i*12+11);
+
+      vboMesh.addTriangle(vboOut, baseIndex2+i*12+3,baseIndex2+i*12+5,baseIndex2+i*12+7);
+      vboMesh.addTriangle(vboOut, baseIndex2+i*12+3,baseIndex2+i*12+7,baseIndex2+i*12+9);
+
+    }
+    
+    //stitch faces
+    var faceVbo = connectorTris[numLegs];
+    for(var i=0;i<faceVbo.numIndices;) {
+      var i1 = faceVbo.indexData[i++];
+      var i2 = faceVbo.indexData[i++];
+      var i3 = faceVbo.indexData[i++];
+      //vboMesh.addTriangle(vboOut, baseIndex+i1*2, baseIndex+i3*2, baseIndex+i2*2);
+      var bi1 = baseIndex4+i1;
+      var bi2 = baseIndex4+i3;
+      var bi3 = baseIndex4+i2;
+      if(i1 >= numPts) {
+        bi1 = baseIndex+i1*2;
+      }
+      if(i3 >= numPts) {
+        bi2 = baseIndex+i3*2;
+      }
+      if(i2 >= numPts) {
+        bi3 = baseIndex+i2*2;
+      }
+      vboMesh.addTriangle(vboOut, bi1,bi2,bi3);
+      vboMesh.addTriangle(vboOut, baseIndex+i1*2+1, baseIndex+i2*2+1, baseIndex+i3*2+1);      
+    }
+    
+    //add labels
+    /*
+    for(var i=0;i<numLegs;++i) {
+      dir = dirs[i];
+      var tens = Math.floor(labels[i]/10)%10;
+      var ones = labels[i]%10;
+      mat4.identity(trans);
+      mat4.translate(trans,trans,labelsPt[i]);
+      var angle = Math.atan2(-dir[0],dir[1]);
+      mat4.rotateZ(trans,trans,angle);
+      mat4.scale(trans,trans,[-labelHeight,labelHeight,1]);
+      vec2.set(perp,dir[1],-dir[0]);
+      
+      vboMesh.addMeshTransform(vboOut,text.numVbos[tens], trans);
+      
+      vec2.scaleAndAdd(labelsPt[i],labelsPt[i], perp,-labelHeight);
+      mat4.identity(trans);
+      mat4.translate(trans,trans,labelsPt[i]);
+      mat4.rotateZ(trans,trans,angle);
+      mat4.scale(trans,trans,[-labelHeight,labelHeight,1]);
+      vboMesh.addMeshTransform(vboOut,text.numVbos[ones], trans);
+    }
+    */
+  }
+})();
 
 exports.getShelfLength = getShelfLength;
 exports.createConnector = createConnector;
@@ -1016,7 +1416,7 @@ var tempVbo;
 var colorInfo;
 
 var minimumShelf = 75;//85;//105;
-var flattenAngle = Math.PI*.1;
+var flattenAngle = 0;//Math.PI*.1;
 bookshelf.flattenAngle = flattenAngle;
 var sinFlattenAngle = Math.sin(flattenAngle);
 
@@ -1067,7 +1467,7 @@ function init() {
 function initCircle() {
   circleVbo = vboMesh.create();
   vboMesh.addVertex(circleVbo,[0,0,0]);
-  for(var i=0;i<12;++i) {
+  for(var i=0;i<=12;++i) {
     var angle = i*Math.PI*2.0/12.0;
     vboMesh.addVertex(circleVbo, [6*Math.cos(angle),6*Math.sin(angle),0]);
   }
@@ -1170,6 +1570,7 @@ function findPair(e,ptToEdge,i1,i2) {
       if(e2.v.index == i1) {
         e2.pair = e;
         e.pair = e2;
+        console.log("found pair");
         return;
       }
     }
@@ -1336,7 +1737,9 @@ function drawShelves() {
   for(var i=0;i<voronoi.mesh.edges.length;++i) {
     var e = voronoi.mesh.edges[i];
     if(e.v.e) {
-      drawShelf(shelfVbo,e);
+      if(e.v.index < e.pair.v.index) {
+        drawShelf(shelfVbo,e);
+      }
     }
   }
   vboMesh.buffer(shelfVbo);
@@ -1404,8 +1807,8 @@ function addQuadFaceTex(vboOut,p1,p2,p3,p4,t1,t2,t3,t4,n) {
   
   vboMesh.addVertex(vboOut,p1,n);
   vboMesh.addTexCoord(vboOut,t1);
-  vboMesh.addVertex(vboOut,p2,n);
-  vboMesh.addTexCoord(vboOut,t2);
+  vboMesh.addVertex(vboOut,p3,n);
+  vboMesh.addTexCoord(vboOut,t3);
   vboMesh.addVertex(vboOut,p4,n);
   vboMesh.addTexCoord(vboOut,t4);
   
@@ -1456,7 +1859,6 @@ function draw3d() {
     phongShader.uniforms.mvMatrix.set(mvMatrix);
     gl.drawArrays(gl.TRIANGLE_FAN,0,circleVbo.numVertices);
     mat4.translate(mvMatrix,mvMatrix,[-pt.x,-pt.y,0]);
-
   }
   phongShader.attribs.vertexNormal.enable();
   phongShader.uniforms.mvMatrix.set(mvMatrix);
@@ -1840,7 +2242,7 @@ var checkHover = (function() {
         var dy = pointer.mouseY-coord[1];
         if(dx*dx+dy*dy < 15*15) {
           selectedPt = i;
-        console.log(dx + " " + dy);
+        //console.log(dx + " " + dy);
           
           document.getElementById("selected").innerHTML = selectedPt;
         }
@@ -5657,7 +6059,7 @@ vboMesh.computeSmoothNormals = (function() {
             vec3.set(p3,vbo.vertexData[i3],vbo.vertexData[i3+1], vbo.vertexData[i3+2]);
             
             planeNormal(norm, p1,p2,p3);
-            vec3.normalize(norm,norm);
+            //vec3.normalize(norm,norm);
             
             vbo.normalData[i1] += norm[0];
             vbo.normalData[i1+1] += norm[1];
@@ -5756,12 +6158,18 @@ var bottomOn = true;
 var rightOn = true;
 var eWeight = 1.0;
 
+var boundary = [];
+boundary.push([0,0,0]);
+boundary.push([width,0,0]);
+boundary.push([width,height,0]);
+boundary.push([0,height,0]);
+boundary = boundary.reverse();
 var epsilon = 0.00001;
 function reset() {
   //make regularly spaced points
   pts.length = 0;
   
-  var defaultSpacing = 250;
+  var defaultSpacing = 200;
   var xDivs = Math.floor(width/(defaultSpacing+1));
   var yDivs = Math.floor(height/(defaultSpacing+1));
   
@@ -5775,6 +6183,12 @@ function reset() {
 }
 
 function init() {
+  boundary.length = 0;
+  boundary.push([0,0,0]);
+  boundary.push([0,height,0]);
+  boundary.push([width,height,0]);
+  boundary.push([width,0,0]);
+
   outsidePts.length = 0;
   var d = 5000;
   outsidePts.push({x:0,y:-d,fixed:true,bottom:true});
@@ -5833,9 +6247,23 @@ var voronoi = (function() {
     }
     
     buildCells();
+    makeBoundaryEdges(voroMesh);
+    markInsideOut();
     trimCells();
   }
 })();
+
+function markInsideOut() {
+  for(var i=0;i<voroMesh.vertices.length;++i) {
+    var v = voroMesh.vertices[i];
+    var winding = windingNumber(v.pos, boundary);
+    if(winding == 0) {
+      v.isInside = false;
+    } else {
+      v.isInside = true;
+    }
+  }
+}
 
 var circumcircle = (function() {
   var v1 = vec2.create();
@@ -5899,6 +6327,11 @@ var orient2d = (function() {
 function setDimensions(w,h) {
   width = w;
   height = h;
+  
+  boundary[3][0] = width;
+  boundary[2][0] = width;
+  boundary[2][1] = height;
+  boundary[1][1] = height;
 }
 
 function editBoundary() {
@@ -5934,69 +6367,6 @@ function editBoundary() {
       */
     }
   }
-  /*
-  for(var i=0,len=triangles.length;i<len;++i) {
-    var t = triangles[i];
-    var bPtCount = 0;
-    var bPts = [];
-    var inPt;
-    for(var j=0;j<3;++j) {
-      if(t.points_[j].boundary) {
-        bPts[bPtCount] = t.points_[j];
-        bPtCount++;
-        
-      } else {
-        inPt = j;
-      }
-    }
-    
-    if(bPtCount==2) {
-      if(inPt == 1) {
-        var temp = bPts[0];
-        bPts[0] = bPts[1];
-        bPts[1] = temp;
-      }
-      inPt = t.points_[inPt];
-      //mirror in pt
-      vec2.set(dir1,bPts[1].x-bPts[0].x,bPts[1].y-bPts[0].y);
-      vec2.set(dir2,inPt.x-bPts[0].x,inPt.y-bPts[0].y);
-      console.log(dir1[0]*dir2[1]-dir1[1]*dir2[0]);
-      vec2.normalize(dir1,dir1);
-      var dot = vec2.dot(dir1,dir2);
-      vec2.scale(dir1,dir1,dot);
-      vec2.sub(dir2,dir1,dir2);
-      vec2.add(dir1,dir1,dir2);
-      var newPt = new poly2tri.Point(dir1[0]+bPts[0].x,dir1[1]+bPts[0].y);
-      newPt.fixed = true;
-      //new triangle
-      var newT = new poly2tri.Triangle(bPts[0],bPts[1],newPt);
-      newT.interior_ = true;
-      newT.new1 = true;
-      newT.markNeighbor(t);
-      triangles.push(newT);
-      
-      bPts[0].newPts.push(newPt);
-      bPts[0].newTris.push(newT);
-      bPts[1].newPts.push(newPt);
-      bPts[1].newTris.push(newT);
-    }
-  }
-  vec2.set(dir1,t.points_[1].x-t.points_[0].x,t.points_[1].y-t.points_[0].y);
-  vec2.set(dir2,t.points_[2].x-t.points_[0].x,t.points_[2].y-t.points_[0].y);
-  console.log(dir1[0]*dir2[1]-dir1[1]*dir2[0]);
-  
-  for(var i=0;i<pts.length;++i) {
-    var pt = pts[i];
-    if(pt.boundary && pt.newPts.length == 2) {
-      var newT = new poly2tri.Triangle(pt,pt.newPts[0],pt.newPts[1]);
-      newT.new2 = true;
-      newT.interior_ = true;
-      newT.markNeighbor(pt.newTris[0]);
-      newT.markNeighbor(pt.newTris[1]);
-      triangles.push(newT);
-    }
-  }
-  */
 }
 
 function unmarkNeighbor(t1,t2) {
@@ -6092,7 +6462,6 @@ var buildCells = function() {
       }
     }
   }
-  makeBoundaryEdges(voroMesh, ptToEdge);
 }
 
 function buildCell(pt,t) {
@@ -6150,12 +6519,13 @@ function findPair(e,ptToEdge,i1,i2) {
   }
 }
 
-function makeBoundaryEdges(mesh,ptToEdge) {
+function makeBoundaryEdges(mesh) {
   //add boundary edges and ensure every edge has a pair
   var numEdges = mesh.edges.length;
   var e,v,startV;
+  var ptToEdge = [];
   for(var i=0;i<numEdges;++i) {
-     e = mesh.edges[i];
+    e = mesh.edges[i];
     if(e.pair == null) {
       var newEdge = mesh.addEdge();
       newEdge.pair = e;
@@ -6169,43 +6539,68 @@ function makeBoundaryEdges(mesh,ptToEdge) {
       } while(e.v != startV);
       newEdge.v = v;
       newEdge.v.b = true;
-      var ptEdge = ptToEdge[startV.index];
-      ptEdge.push(newEdge);
+      ptToEdge[startV.index] = newEdge;
     }
   }
   for(var i=numEdges;i<mesh.edges.length;++i) {
     e = mesh.edges[i];
     var ptEdge = ptToEdge[e.v.index];
     if(ptEdge) {
-      for(var j=0;j<ptEdge.length;++j) {
-        var e2 = ptEdge[j];
-        if(e2.face == hemesh.NULLFACE) {
-          e.next = e2;
-        }
-      }
+      e.next = ptEdge;
+    } else {
+      console.log("error: no next boundary found");
     }
   }
 }
 
 function isInside(pt) {
-  var insideVal = 1;
-  if(pt[0] >= width-epsilon) {
-    insideVal = Math.min(insideVal, rightOn ? 0 : -1);
-  }
-  if(pt[0] <= epsilon) {
-    insideVal = Math.min(insideVal, leftOn ? 0 : -1);
-  }
-  if(pt[1] >= height-epsilon) {
-    insideVal = Math.min(insideVal, topOn ? 0 : -1);
-  }
-  if(pt[1] <= epsilon) {
-    insideVal = Math.min(insideVal, bottomOn ? 0 : -1);
-  }
-  return insideVal;
+  return pt.isInside;
   //return pt[0] > 0 && pt[0] < width && pt[1] > 0 && pt[1] < height;
 }
 
-var trimEdge = (function() {  
+var segSegIntersect = function(out,s1pt1,s1pt2,s2pt1,s2pt2) {
+    var dx1 = s1pt2[0]-s1pt1[0];
+    var dx2 = s2pt2[0]-s2pt1[0];
+    var dy1 = s1pt2[1]-s1pt1[1];
+    var dy2 = s2pt2[1]-s2pt1[1];
+    var ax = s2pt1[0]-s1pt1[0];
+    var ay = s2pt1[1]-s1pt1[1];
+    //z component of cross product: sin(A)*|L1||L2|
+    var crossish =  dx1*dy2-dy1*dx2;
+    var u = (ax*dy1-ay*dx1)/crossish;
+    if(u <= 0 || u > 1) return false;
+    var t = (ax*dy2-ay*dx2)/crossish;
+    if(t < 0 || t > 1) return false;
+    out[0] = dx2*u+s2pt1[0];
+    out[1] = dy2*u+s2pt1[1];
+    return true;
+};
+
+var trimEdge = (function() {
+  var dir = vec2.create();
+  var dir2 = vec2.create();
+  var bPt;
+  
+  return function trimEdge(out, inP,outP) {
+    var prevPt = boundary[boundary.length-1];
+    var prevIndex = boundary.length-1;
+    vec2.sub(dir, outP, inP);
+    var len = vec2.len(dir);
+    vec2.scale(dir,dir,1.0/len);
+    for(var i=0;i<boundary.length;++i) {
+      bPt = boundary[i];
+      if(segSegIntersect(out, inP, outP, prevPt, bPt)) {
+        return i;
+        //return prevIndex;
+      }
+      
+      prevIndex = i;
+      prevPt = bPt;
+    }
+  }
+})();
+
+var trimEdgeX = (function() {  
   var dir = vec2.create();
   return function trimEdge(out,inP,outP) {
   
@@ -6224,6 +6619,7 @@ var trimEdge = (function() {
       } else {
         out[0] = 0;
         out[1] = inP[1]+dir[1]*(-inP[0]/dir[0]);
+        return 3;
       }
     } else if(outP[0] > width) {
       if(outP[1] <0) {
@@ -6249,22 +6645,113 @@ var trimEdge = (function() {
       
       }
     }
+    return 0;
   }
 })();
 
 var EPSILON = 0.00001;
 
 var trimCells = (function() {
-  var f;
+  var f, e, tInfo, tv;
+  var pt = vec3.create();
   return function trimCells() {
+    for(var i=0;i<voroMesh.edges.length;++i) {
+      e = voroMesh.edges[i];
+      if(!isInside(e.v) && isInside(e.pair.v)) {
+        e.info.trimmed = true;
+        tInfo = trimEdge(pt, e.pair.v.pos,e.v.pos);
+        tv = voroMesh.addVertex(pt);
+        tv.w = eWeight;
+        tv.b = true;
+        tv.isInside = true;
+        e.info.trimIndex = tInfo;
+        e.v = tv;
+        tv.e = e;
+      } 
+    }
     for(var i=0,l = voroMesh.faces.length;i<l; ++i) {
       f = voroMesh.faces[i];
       trimFace(f);
     }
+    makeBoundaryEdges(voroMesh);
+
+    //clean
+    for(var i=0;i<voroMesh.vertices.length;) {
+      if(!isInside(voroMesh.vertices[i])) {
+        voroMesh.vertices.splice(i,1);
+      } else {
+        voroMesh.vertices[i].index = i;
+        i++;
+      }
+    }
+    for(var i=0;i<voroMesh.edges.length;) {
+      e = voroMesh.edges[i];
+      if(!isInside(e.v) && (e.pair.v == null || !isInside(e.pair.v))) {
+        e.pair = null;
+        e.next = null;
+        e.v = null;
+        e.face = null;
+        voroMesh.edges.splice(i,1);
+      } else {
+        e.index = i;
+        i++;
+      }
+    }
+    
   }
 })();
 
 var trimFace = (function() {
+  var trimPt = vec3.create();
+  var v,e, startE;
+  var newV, trimE, trimE2;
+  return function trimFace(f) {
+    startE = f.e;
+    e = startE;
+    //get trimmed edge
+    do {
+      e = e.next;
+    } while(!e.info.trimmed && e != startE);
+    if(!e.info.trimmed) return;
+    
+    trimE = e;
+    do {
+      e = e.next;
+    } while(!e.pair.info.trimmed && e != trimE);
+    if(e == trimE) {
+      console.log("error: out edge find, but no in edge");
+      return;
+    }
+    trimE2 = e.pair;
+    
+    var bIndex = trimE.info.trimIndex;
+    e = trimE;
+    while(bIndex != trimE2.info.trimIndex) {
+      var newV = voroMesh.addVertex(boundary[bIndex]);
+      newV.pos[2] = 0;
+      newV.isInside = true;
+      newV.w = eWeight;
+      var newE = voroMesh.addEdge();
+      newE.v = newV;
+      newV.e = newE;
+      newE.face = f;
+      
+      e.next = newE;
+      e = newE;
+      
+      bIndex = (bIndex+1)%boundary.length;
+    }
+    //add edge to trimE2.v
+    f.e = trimE;
+    var newE = voroMesh.addEdge();
+    newE.v = trimE2.v;
+    e.next = newE;
+    newE.next = trimE2.pair;
+    newE.face = f;
+  }
+})();
+
+var trimFace2 = (function() {
   var trimPt = vec3.create();
   var v,e, startE, prevE;
   var newV;
@@ -6275,18 +6762,18 @@ var trimFace = (function() {
     //watchout for infinite loop (not done)
     do {
       e = e.next;
-    } while(isInside(e.v.pos) <= 0 && e != startE);
+    } while(isInside(e.v) <= 0 && e != startE);
     startE = e;
     //find first outside pt
     do {
       
       prevE = e;
       e = e.next;
-    } while(isInside(e.v.pos) > 0 && e != startE);
+    } while(isInside(e.v) > 0 && e != startE);
     
-    if(isInside(e.v.pos) > 0) { return; }
+    if(isInside(e.v) > 0) { return; }
     
-    if(isInside(e.v.pos) < 0) f.on = false;
+    if(isInside(e.v) < 0) f.on = false;
     
     startE = e;
     f.e = e;      
@@ -6308,8 +6795,8 @@ var trimFace = (function() {
     }
     
     e = e.next;
-    while(isInside(e.v.pos) <= 0 && e != startE) {
-      if(isInside(e.v.pos) < 0) f.on = false;
+    while(isInside(e.v) <= 0 && e != startE) {
+      if(isInside(e.v) < 0) f.on = false;
       e.v.e = null;
       e = e.next;
     }    
@@ -6469,6 +6956,41 @@ var trimFace = (function() {
     }
 
 */
+
+/*
+  point in polygon adapted from http://geomalgorithms.com/a03-_inclusion.html
+  Copyright 2000 softSurfer, 2012 Dan Sunday
+  javascript port by Jesse Louis-Rosenberg 2015
+*/
+function isLeft(p0, p1, p2 )
+{
+    return ( (p1[0] - p0[0]) * (p2[1] - p0[1])
+            - (p2[0] -  p0[0]) * (p1[1] - p0[1]) );
+}
+//===================================================================
+
+
+function windingNumber(p,poly) {
+  var wn = 0;    // the  winding number counter
+  var v1,v2;
+  //loop through all edges of the polygon
+  for (var i=0; i<poly.length; i++) {   // edge from V[i] to  V[i+1]
+    v1 = poly[i];
+    var iNext = (i+1)%poly.length;
+    v2 = poly[iNext];
+    if (v1[1] <= p[1]) {          // start y <= P.y
+      if (v2[1]  > p[1])      // an upward crossing
+        if (isLeft( v1,v2, p) > 0)  // P left of  edge
+          ++wn;            // have  a valid up intersect
+    }
+    else {                        // start y > P.y (no test needed)
+      if (v2[1]  <= p[1])     // a downward crossing
+        if (isLeft( v1, v2, p) < 0)  // P right of  edge
+          --wn;            // have  a valid down intersect
+    }
+  }
+  return wn;
+}
 
 exports.init = init;
 exports.reset = reset;
@@ -6777,6 +7299,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       loadXMLDoc(vertexFile, function(txt) {vertShader = getShader(gl, txt, "vertex");if(++loaded == 2) setupShaderProgram(gl,shaderProgram, vertShader,fragShader,function(prog) {glShader.makeShader(gl,prog,shader);})});
       loadXMLDoc(fragmentFile, function(txt) {fragShader = getShader(gl, txt, "fragment");if(++loaded == 2) setupShaderProgram(gl,shaderProgram, vertShader,fragShader,function(prog) {glShader.makeShader(gl,prog,shader);})});
       return shader;
+  }
+  
+  glShader.setupShader = function(gl, vertTxt, fragTxt) {
+    var shaderProgram = gl.createProgram();
+    var shader = new Shader(gl,shaderProgram);
+    
+    var vertShader = getShader(gl, vertTxt, "vertex");
+    var fragShader = getShader(gl, fragTxt, "fragment");
+    setupShaderProgram(gl,shaderProgram, vertShader,fragShader,function(prog) {glShader.makeShader(gl,prog,shader);});
+    return shader;
   }
 
   //if(typeof(exports) !== 'undefined') {

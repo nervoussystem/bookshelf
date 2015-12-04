@@ -21,12 +21,18 @@ var bottomOn = true;
 var rightOn = true;
 var eWeight = 1.0;
 
+var boundary = [];
+boundary.push([0,0,0]);
+boundary.push([width,0,0]);
+boundary.push([width,height,0]);
+boundary.push([0,height,0]);
+boundary = boundary.reverse();
 var epsilon = 0.00001;
 function reset() {
   //make regularly spaced points
   pts.length = 0;
   
-  var defaultSpacing = 250;
+  var defaultSpacing = 200;
   var xDivs = Math.floor(width/(defaultSpacing+1));
   var yDivs = Math.floor(height/(defaultSpacing+1));
   
@@ -40,6 +46,12 @@ function reset() {
 }
 
 function init() {
+  boundary.length = 0;
+  boundary.push([0,0,0]);
+  boundary.push([0,height,0]);
+  boundary.push([width,height,0]);
+  boundary.push([width,0,0]);
+
   outsidePts.length = 0;
   var d = 5000;
   outsidePts.push({x:0,y:-d,fixed:true,bottom:true});
@@ -98,9 +110,23 @@ var voronoi = (function() {
     }
     
     buildCells();
+    makeBoundaryEdges(voroMesh);
+    markInsideOut();
     trimCells();
   }
 })();
+
+function markInsideOut() {
+  for(var i=0;i<voroMesh.vertices.length;++i) {
+    var v = voroMesh.vertices[i];
+    var winding = windingNumber(v.pos, boundary);
+    if(winding == 0) {
+      v.isInside = false;
+    } else {
+      v.isInside = true;
+    }
+  }
+}
 
 var circumcircle = (function() {
   var v1 = vec2.create();
@@ -164,6 +190,11 @@ var orient2d = (function() {
 function setDimensions(w,h) {
   width = w;
   height = h;
+  
+  boundary[3][0] = width;
+  boundary[2][0] = width;
+  boundary[2][1] = height;
+  boundary[1][1] = height;
 }
 
 function editBoundary() {
@@ -199,69 +230,6 @@ function editBoundary() {
       */
     }
   }
-  /*
-  for(var i=0,len=triangles.length;i<len;++i) {
-    var t = triangles[i];
-    var bPtCount = 0;
-    var bPts = [];
-    var inPt;
-    for(var j=0;j<3;++j) {
-      if(t.points_[j].boundary) {
-        bPts[bPtCount] = t.points_[j];
-        bPtCount++;
-        
-      } else {
-        inPt = j;
-      }
-    }
-    
-    if(bPtCount==2) {
-      if(inPt == 1) {
-        var temp = bPts[0];
-        bPts[0] = bPts[1];
-        bPts[1] = temp;
-      }
-      inPt = t.points_[inPt];
-      //mirror in pt
-      vec2.set(dir1,bPts[1].x-bPts[0].x,bPts[1].y-bPts[0].y);
-      vec2.set(dir2,inPt.x-bPts[0].x,inPt.y-bPts[0].y);
-      console.log(dir1[0]*dir2[1]-dir1[1]*dir2[0]);
-      vec2.normalize(dir1,dir1);
-      var dot = vec2.dot(dir1,dir2);
-      vec2.scale(dir1,dir1,dot);
-      vec2.sub(dir2,dir1,dir2);
-      vec2.add(dir1,dir1,dir2);
-      var newPt = new poly2tri.Point(dir1[0]+bPts[0].x,dir1[1]+bPts[0].y);
-      newPt.fixed = true;
-      //new triangle
-      var newT = new poly2tri.Triangle(bPts[0],bPts[1],newPt);
-      newT.interior_ = true;
-      newT.new1 = true;
-      newT.markNeighbor(t);
-      triangles.push(newT);
-      
-      bPts[0].newPts.push(newPt);
-      bPts[0].newTris.push(newT);
-      bPts[1].newPts.push(newPt);
-      bPts[1].newTris.push(newT);
-    }
-  }
-  vec2.set(dir1,t.points_[1].x-t.points_[0].x,t.points_[1].y-t.points_[0].y);
-  vec2.set(dir2,t.points_[2].x-t.points_[0].x,t.points_[2].y-t.points_[0].y);
-  console.log(dir1[0]*dir2[1]-dir1[1]*dir2[0]);
-  
-  for(var i=0;i<pts.length;++i) {
-    var pt = pts[i];
-    if(pt.boundary && pt.newPts.length == 2) {
-      var newT = new poly2tri.Triangle(pt,pt.newPts[0],pt.newPts[1]);
-      newT.new2 = true;
-      newT.interior_ = true;
-      newT.markNeighbor(pt.newTris[0]);
-      newT.markNeighbor(pt.newTris[1]);
-      triangles.push(newT);
-    }
-  }
-  */
 }
 
 function unmarkNeighbor(t1,t2) {
@@ -357,7 +325,6 @@ var buildCells = function() {
       }
     }
   }
-  makeBoundaryEdges(voroMesh, ptToEdge);
 }
 
 function buildCell(pt,t) {
@@ -415,12 +382,13 @@ function findPair(e,ptToEdge,i1,i2) {
   }
 }
 
-function makeBoundaryEdges(mesh,ptToEdge) {
+function makeBoundaryEdges(mesh) {
   //add boundary edges and ensure every edge has a pair
   var numEdges = mesh.edges.length;
   var e,v,startV;
+  var ptToEdge = [];
   for(var i=0;i<numEdges;++i) {
-     e = mesh.edges[i];
+    e = mesh.edges[i];
     if(e.pair == null) {
       var newEdge = mesh.addEdge();
       newEdge.pair = e;
@@ -434,43 +402,68 @@ function makeBoundaryEdges(mesh,ptToEdge) {
       } while(e.v != startV);
       newEdge.v = v;
       newEdge.v.b = true;
-      var ptEdge = ptToEdge[startV.index];
-      ptEdge.push(newEdge);
+      ptToEdge[startV.index] = newEdge;
     }
   }
   for(var i=numEdges;i<mesh.edges.length;++i) {
     e = mesh.edges[i];
     var ptEdge = ptToEdge[e.v.index];
     if(ptEdge) {
-      for(var j=0;j<ptEdge.length;++j) {
-        var e2 = ptEdge[j];
-        if(e2.face == hemesh.NULLFACE) {
-          e.next = e2;
-        }
-      }
+      e.next = ptEdge;
+    } else {
+      console.log("error: no next boundary found");
     }
   }
 }
 
 function isInside(pt) {
-  var insideVal = 1;
-  if(pt[0] >= width-epsilon) {
-    insideVal = Math.min(insideVal, rightOn ? 0 : -1);
-  }
-  if(pt[0] <= epsilon) {
-    insideVal = Math.min(insideVal, leftOn ? 0 : -1);
-  }
-  if(pt[1] >= height-epsilon) {
-    insideVal = Math.min(insideVal, topOn ? 0 : -1);
-  }
-  if(pt[1] <= epsilon) {
-    insideVal = Math.min(insideVal, bottomOn ? 0 : -1);
-  }
-  return insideVal;
+  return pt.isInside;
   //return pt[0] > 0 && pt[0] < width && pt[1] > 0 && pt[1] < height;
 }
 
-var trimEdge = (function() {  
+var segSegIntersect = function(out,s1pt1,s1pt2,s2pt1,s2pt2) {
+    var dx1 = s1pt2[0]-s1pt1[0];
+    var dx2 = s2pt2[0]-s2pt1[0];
+    var dy1 = s1pt2[1]-s1pt1[1];
+    var dy2 = s2pt2[1]-s2pt1[1];
+    var ax = s2pt1[0]-s1pt1[0];
+    var ay = s2pt1[1]-s1pt1[1];
+    //z component of cross product: sin(A)*|L1||L2|
+    var crossish =  dx1*dy2-dy1*dx2;
+    var u = (ax*dy1-ay*dx1)/crossish;
+    if(u <= 0 || u > 1) return false;
+    var t = (ax*dy2-ay*dx2)/crossish;
+    if(t < 0 || t > 1) return false;
+    out[0] = dx2*u+s2pt1[0];
+    out[1] = dy2*u+s2pt1[1];
+    return true;
+};
+
+var trimEdge = (function() {
+  var dir = vec2.create();
+  var dir2 = vec2.create();
+  var bPt;
+  
+  return function trimEdge(out, inP,outP) {
+    var prevPt = boundary[boundary.length-1];
+    var prevIndex = boundary.length-1;
+    vec2.sub(dir, outP, inP);
+    var len = vec2.len(dir);
+    vec2.scale(dir,dir,1.0/len);
+    for(var i=0;i<boundary.length;++i) {
+      bPt = boundary[i];
+      if(segSegIntersect(out, inP, outP, prevPt, bPt)) {
+        return i;
+        //return prevIndex;
+      }
+      
+      prevIndex = i;
+      prevPt = bPt;
+    }
+  }
+})();
+
+var trimEdgeX = (function() {  
   var dir = vec2.create();
   return function trimEdge(out,inP,outP) {
   
@@ -489,6 +482,7 @@ var trimEdge = (function() {
       } else {
         out[0] = 0;
         out[1] = inP[1]+dir[1]*(-inP[0]/dir[0]);
+        return 3;
       }
     } else if(outP[0] > width) {
       if(outP[1] <0) {
@@ -514,22 +508,113 @@ var trimEdge = (function() {
       
       }
     }
+    return 0;
   }
 })();
 
 var EPSILON = 0.00001;
 
 var trimCells = (function() {
-  var f;
+  var f, e, tInfo, tv;
+  var pt = vec3.create();
   return function trimCells() {
+    for(var i=0;i<voroMesh.edges.length;++i) {
+      e = voroMesh.edges[i];
+      if(!isInside(e.v) && isInside(e.pair.v)) {
+        e.info.trimmed = true;
+        tInfo = trimEdge(pt, e.pair.v.pos,e.v.pos);
+        tv = voroMesh.addVertex(pt);
+        tv.w = eWeight;
+        tv.b = true;
+        tv.isInside = true;
+        e.info.trimIndex = tInfo;
+        e.v = tv;
+        tv.e = e;
+      } 
+    }
     for(var i=0,l = voroMesh.faces.length;i<l; ++i) {
       f = voroMesh.faces[i];
       trimFace(f);
     }
+    makeBoundaryEdges(voroMesh);
+
+    //clean
+    for(var i=0;i<voroMesh.vertices.length;) {
+      if(!isInside(voroMesh.vertices[i])) {
+        voroMesh.vertices.splice(i,1);
+      } else {
+        voroMesh.vertices[i].index = i;
+        i++;
+      }
+    }
+    for(var i=0;i<voroMesh.edges.length;) {
+      e = voroMesh.edges[i];
+      if(!isInside(e.v) && (e.pair.v == null || !isInside(e.pair.v))) {
+        e.pair = null;
+        e.next = null;
+        e.v = null;
+        e.face = null;
+        voroMesh.edges.splice(i,1);
+      } else {
+        e.index = i;
+        i++;
+      }
+    }
+    
   }
 })();
 
 var trimFace = (function() {
+  var trimPt = vec3.create();
+  var v,e, startE;
+  var newV, trimE, trimE2;
+  return function trimFace(f) {
+    startE = f.e;
+    e = startE;
+    //get trimmed edge
+    do {
+      e = e.next;
+    } while(!e.info.trimmed && e != startE);
+    if(!e.info.trimmed) return;
+    
+    trimE = e;
+    do {
+      e = e.next;
+    } while(!e.pair.info.trimmed && e != trimE);
+    if(e == trimE) {
+      console.log("error: out edge find, but no in edge");
+      return;
+    }
+    trimE2 = e.pair;
+    
+    var bIndex = trimE.info.trimIndex;
+    e = trimE;
+    while(bIndex != trimE2.info.trimIndex) {
+      var newV = voroMesh.addVertex(boundary[bIndex]);
+      newV.pos[2] = 0;
+      newV.isInside = true;
+      newV.w = eWeight;
+      var newE = voroMesh.addEdge();
+      newE.v = newV;
+      newV.e = newE;
+      newE.face = f;
+      
+      e.next = newE;
+      e = newE;
+      
+      bIndex = (bIndex+1)%boundary.length;
+    }
+    //add edge to trimE2.v
+    f.e = trimE;
+    var newE = voroMesh.addEdge();
+    newE.v = trimE2.v;
+    e.next = newE;
+    newE.next = trimE2.pair;
+    newE.face = f;
+  }
+})();
+
+var trimFace2 = (function() {
   var trimPt = vec3.create();
   var v,e, startE, prevE;
   var newV;
@@ -540,18 +625,18 @@ var trimFace = (function() {
     //watchout for infinite loop (not done)
     do {
       e = e.next;
-    } while(isInside(e.v.pos) <= 0 && e != startE);
+    } while(isInside(e.v) <= 0 && e != startE);
     startE = e;
     //find first outside pt
     do {
       
       prevE = e;
       e = e.next;
-    } while(isInside(e.v.pos) > 0 && e != startE);
+    } while(isInside(e.v) > 0 && e != startE);
     
-    if(isInside(e.v.pos) > 0) { return; }
+    if(isInside(e.v) > 0) { return; }
     
-    if(isInside(e.v.pos) < 0) f.on = false;
+    if(isInside(e.v) < 0) f.on = false;
     
     startE = e;
     f.e = e;      
@@ -573,8 +658,8 @@ var trimFace = (function() {
     }
     
     e = e.next;
-    while(isInside(e.v.pos) <= 0 && e != startE) {
-      if(isInside(e.v.pos) < 0) f.on = false;
+    while(isInside(e.v) <= 0 && e != startE) {
+      if(isInside(e.v) < 0) f.on = false;
       e.v.e = null;
       e = e.next;
     }    
@@ -734,6 +819,41 @@ var trimFace = (function() {
     }
 
 */
+
+/*
+  point in polygon adapted from http://geomalgorithms.com/a03-_inclusion.html
+  Copyright 2000 softSurfer, 2012 Dan Sunday
+  javascript port by Jesse Louis-Rosenberg 2015
+*/
+function isLeft(p0, p1, p2 )
+{
+    return ( (p1[0] - p0[0]) * (p2[1] - p0[1])
+            - (p2[0] -  p0[0]) * (p1[1] - p0[1]) );
+}
+//===================================================================
+
+
+function windingNumber(p,poly) {
+  var wn = 0;    // the  winding number counter
+  var v1,v2;
+  //loop through all edges of the polygon
+  for (var i=0; i<poly.length; i++) {   // edge from V[i] to  V[i+1]
+    v1 = poly[i];
+    var iNext = (i+1)%poly.length;
+    v2 = poly[iNext];
+    if (v1[1] <= p[1]) {          // start y <= P.y
+      if (v2[1]  > p[1])      // an upward crossing
+        if (isLeft( v1,v2, p) > 0)  // P left of  edge
+          ++wn;            // have  a valid up intersect
+    }
+    else {                        // start y > P.y (no test needed)
+      if (v2[1]  <= p[1])     // a downward crossing
+        if (isLeft( v1, v2, p) < 0)  // P right of  edge
+          --wn;            // have  a valid down intersect
+    }
+  }
+  return wn;
+}
 
 exports.init = init;
 exports.reset = reset;

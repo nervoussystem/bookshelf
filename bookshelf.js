@@ -7,7 +7,7 @@ bookshelf.width = 2*12*25.4; //bookshelf width in mm
 bookshelf.height = 2*12*25.4; //bookshelf height in mm
 bookshelf.depth = 254; //bookshelf depth in mm
 
-bookshelf.woodWidth = 5.25;//6.35;//12.2; //thickness of the wood sheets in mm
+bookshelf.woodWidth = 5.95;//6.35;//12.2; //thickness of the wood sheets in mm
 bookshelf.flattenAngle = Math.PI*0.1;
 
 /*

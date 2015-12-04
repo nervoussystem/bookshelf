@@ -36,7 +36,7 @@ var tempVbo;
 var colorInfo;
 
 var minimumShelf = 75;//85;//105;
-var flattenAngle = Math.PI*.1;
+var flattenAngle = 0;//Math.PI*.1;
 bookshelf.flattenAngle = flattenAngle;
 var sinFlattenAngle = Math.sin(flattenAngle);
 
@@ -87,7 +87,7 @@ function init() {
 function initCircle() {
   circleVbo = vboMesh.create();
   vboMesh.addVertex(circleVbo,[0,0,0]);
-  for(var i=0;i<12;++i) {
+  for(var i=0;i<=12;++i) {
     var angle = i*Math.PI*2.0/12.0;
     vboMesh.addVertex(circleVbo, [6*Math.cos(angle),6*Math.sin(angle),0]);
   }
@@ -190,6 +190,7 @@ function findPair(e,ptToEdge,i1,i2) {
       if(e2.v.index == i1) {
         e2.pair = e;
         e.pair = e2;
+        console.log("found pair");
         return;
       }
     }
@@ -356,7 +357,9 @@ function drawShelves() {
   for(var i=0;i<voronoi.mesh.edges.length;++i) {
     var e = voronoi.mesh.edges[i];
     if(e.v.e) {
-      drawShelf(shelfVbo,e);
+      if(e.v.index < e.pair.v.index) {
+        drawShelf(shelfVbo,e);
+      }
     }
   }
   vboMesh.buffer(shelfVbo);
@@ -424,8 +427,8 @@ function addQuadFaceTex(vboOut,p1,p2,p3,p4,t1,t2,t3,t4,n) {
   
   vboMesh.addVertex(vboOut,p1,n);
   vboMesh.addTexCoord(vboOut,t1);
-  vboMesh.addVertex(vboOut,p2,n);
-  vboMesh.addTexCoord(vboOut,t2);
+  vboMesh.addVertex(vboOut,p3,n);
+  vboMesh.addTexCoord(vboOut,t3);
   vboMesh.addVertex(vboOut,p4,n);
   vboMesh.addTexCoord(vboOut,t4);
   
@@ -476,7 +479,6 @@ function draw3d() {
     phongShader.uniforms.mvMatrix.set(mvMatrix);
     gl.drawArrays(gl.TRIANGLE_FAN,0,circleVbo.numVertices);
     mat4.translate(mvMatrix,mvMatrix,[-pt.x,-pt.y,0]);
-
   }
   phongShader.attribs.vertexNormal.enable();
   phongShader.uniforms.mvMatrix.set(mvMatrix);
@@ -860,7 +862,7 @@ var checkHover = (function() {
         var dy = pointer.mouseY-coord[1];
         if(dx*dx+dy*dy < 15*15) {
           selectedPt = i;
-        console.log(dx + " " + dy);
+        //console.log(dx + " " + dy);
           
           document.getElementById("selected").innerHTML = selectedPt;
         }
