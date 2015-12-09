@@ -772,9 +772,14 @@ function load(id) {
 function loadJSON(str) {
   var loadObj = JSON.parse(str);
   voronoi.boundary.length = 0;
+  var maxX = 0, maxY = 0;
   for(var i=0;i<loadObj.boundary.length;++i) {
     voronoi.boundary.push(loadObj.boundary[i]);
+    maxX = Math.max(maxX, loadObj.boundary[i][0]);
+    maxY = Math.max(maxY, loadObj.boundary[i][1]);
   }
+  bookshelf.width = maxX;
+  bookshelf.height = maxY;
   voronoi.pts.length = 0;
   for(var i=0;i<loadObj.pts.length;) {
     var x = loadObj.pts[i++];

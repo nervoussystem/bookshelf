@@ -10,7 +10,7 @@ var text = require("./text.js");
 var poly2tri = require("./poly2tri.js");
 var SweepContext = poly2tri.SweepContext;
 
-var woodWidth = 5.95;//6.35;//12.2;
+var woodWidth = 6.3;//5.95;//6.35;//12.2;
 var conLen = 25; //45
 var conOffset = 8;//12;
 var conWidth = 8;//12;//20
@@ -19,8 +19,8 @@ var printTolerance = 0;
 var labelHeight = 3.1;
 var filletRadius = 7;//9;
 
-var toothWidth = 2.35;//2.5;
-var toothDepth = 1.4;//2.5;
+var toothWidth = 2.8;//2.35;//2.5;
+var toothDepth = 1.8;//1.4;//2.5;
 var toothOffset = 11;//12.25;
 
 var bottomLip = .3;
@@ -353,6 +353,7 @@ var createConnector = (function() {
     
     for(var i=0;i<numLegs;++i) {
       dir = dirs[i];
+      var hundreds = Math.floor(labels[i]/100)%10;
       var tens = Math.floor(labels[i]/10)%10;
       var ones = labels[i]%10;
       mat4.identity(trans);
@@ -370,6 +371,14 @@ var createConnector = (function() {
       mat4.rotateZ(trans,trans,angle);
       mat4.scale(trans,trans,[-labelHeight,labelHeight,1]);
       vboMesh.addMeshTransform(vboOut,text.numVbos[ones], trans);
+      if(hundreds > 0) {
+        vec2.scaleAndAdd(labelsPt[i],labelsPt[i], perp,2*labelHeight);
+        mat4.identity(trans);
+        mat4.translate(trans,trans,labelsPt[i]);
+        mat4.rotateZ(trans,trans,angle);
+        mat4.scale(trans,trans,[-labelHeight,labelHeight,1]);
+        vboMesh.addMeshTransform(vboOut,text.numVbos[hundreds], trans);
+      }
     }
     
   }
